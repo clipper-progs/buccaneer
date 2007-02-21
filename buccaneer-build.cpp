@@ -71,9 +71,9 @@ std::vector<Ca_build::Clash> Ca_build::find_clashes( clipper::MiniMol& mol ) con
   for ( int p = 0; p < mol.size(); p++ ) {
     for ( int m = 0; m < mol[p].size(); m++ ) {
       int a = mol[p][m].lookup( " CA ", clipper::MM::ANY );
-      o1 = mol[p][m][a].coord_orth();
-      f1 = o1.coord_frac( cell );
       if ( a >= 0 ) {
+	o1 = mol[p][m][a].coord_orth();
+	f1 = o1.coord_frac( cell );
 	atoms = nb( o1, 8.0 );
 	catoms.resize( atoms.size() );
 	for ( int i = 0; i < atoms.size(); i++ ) {

@@ -10,9 +10,12 @@
 class Ca_find {
  public:
   Ca_find( int n_find = 500 ) : nfind( n_find ) {}
-  bool operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget ) const;
+  bool operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget );
  private:
   int nfind;
+  clipper::Xmap<float> resultscr;
+  clipper::Xmap<int>   resultrot;
+  clipper::Xmap<int>   resulttrn;
 };
 
 

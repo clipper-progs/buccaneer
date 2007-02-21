@@ -44,18 +44,21 @@ bool Ca_grow::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1,
     }
   if ( chain.size() > 0 ) chains.push_back( chain );
 
-  // first we build 3 residues on to each chain to assess the llk cutoff
-  std::vector<double> scores;
-  for ( int chn = 0; chn < chains.size(); chn++ ) {
-    chain.clear();
-    chain.push_back( chains[chn].back() );
-    chain.push_back( next_ca_group( chain, xmap, llktarget ) );
-    chain.push_back( next_ca_group( chain, xmap, llktarget ) );
-    chain.push_back( next_ca_group( chain, xmap, llktarget ) );
-    scores.push_back( llktarget.llk( xmap, chain.back().rtop_from_std_ori() ) );
+  // establish map statistics to determine stopping value for building
+  std::vector<double> scr;
+  for ( int i = 0; i < 5000; i++ ) {
+    double r = double(i);
+    clipper::Euler_ccp4 rot( 2.0*r, 3.0*r, 5.0*r );
+    clipper::Rotation ro( rot );
+      clipper::Coord_grid cg( 23*i, 29*i, 31*i );
+      clipper::Coord_orth trn =
+	cg.coord_frac( xmap.grid_sampling() ).coord_orth( xmap.cell() );
+      clipper::RTop_orth rtop( ro.matrix(), trn );
+      double s = llktarget.llk( xmap, rtop );
+      scr.push_back( s );
   }
-  std::sort( scores.begin(), scores.end() );
-  double cutoff = scores[ (scores.size()-1) * 9 / 10 ];
+  std::sort( scr.begin(), scr.end() );
+  double cutoff = scr[50];  // select score for top 1% of cases
 
   // now build up to 20 residues each way
   Ca_group ca;
@@ -73,7 +76,7 @@ bool Ca_grow::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1,
   }
 
   // make a new mmdb
-  mol2 = clipper::MiniMol( xmap.spacegroup(), xmap.cell() );
+  mol2 = clipper::MiniMol( mol1.spacegroup(), mol1.cell() );
   for ( int chn = 0; chn < chains.size(); chn++ ) {
     clipper::MPolymer chain;
     int ires = 1;

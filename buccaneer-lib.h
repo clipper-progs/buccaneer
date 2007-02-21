@@ -62,76 +62,64 @@ template<class T> class Score_list {
   directly. */
 class LLK_map_target {
  public:
+  //! null constructor
+  LLK_map_target() {}
   //! constructor: provide radius and sampling in A for LLK target
-  LLK_map_target( const clipper::ftype& rad, const clipper::ftype& sampling );
+  LLK_map_target( const clipper::ftype& rad, const clipper::ftype& sampling )
+    { init( rad, sampling ); }
+  //! initialiser: provide radius and sampling in A for LLK target
+  void init( const clipper::ftype& rad, const clipper::ftype& sampling );
   //! prepare LLK target after accumulating density or loading map
   void prep_llk();
   //! accumulate density statistics from a sample orientation in a sample map
   void accumulate( const clipper::Xmap<float>& xmap, const clipper::RTop_orth rtop );
+
+  //! return a list of RTops
+  std::vector<clipper::RTop_orth> rtop_list( const clipper::Spacegroup& spgr, const clipper::ftype& step ) const;
+  //! perform 6-d (RT) search for LLK target in given map with prior
+  void search( clipper::Xmap<float>& resultscr, clipper::Xmap<int>& resultrot, clipper::Xmap<int>& resulttrn, const clipper::Xmap<float>& xmap, const std::vector<clipper::RTop_orth>& rtops ) const;
+
+  //! calculate fast approx to LLK for given orientation
+  clipper::ftype llk_approx( const clipper::Xmap<float>& xmap, const clipper::RTop_orth& rtop ) const { return fasttgt.llk( xmap, rtop ); }
+  //! calculate full LLK for given orientation
+  clipper::ftype llk       ( const clipper::Xmap<float>& xmap, const clipper::RTop_orth& rtop ) const { return slowtgt.llk( xmap, rtop ); }
+  //! output formatted representation
+  clipper::String format() const;
+
+  /*! Class to hold sampled values from LLK map target */
+  class Sampled {
+  public:
+    //! null constructor
+    Sampled() {}
+    //! insert values
+    void insert( clipper::Coord_orth coord,
+		 clipper::ftype tgt, clipper::ftype wgt );
+    //! evaluate llk
+    clipper::ftype llk( const clipper::Xmap<float>& xmap, const clipper::RTop_orth& rtop ) const;
+    //! evaluate correlation
+    clipper::ftype correl( const clipper::Xmap<float>& xmap, const clipper::RTop_orth& rtop ) const;
+    int size() const { return repxyz.size(); }  //!< get number of samples
+    clipper::Coord_orth coord_orth( int i ) const { return repxyz[i]; }
+    clipper::ftype      target( int i )     const { return reptgt[i]; }
+    clipper::ftype      weight( int i )     const { return repwgt[i]; }
+  private:
+    std::vector<clipper::Coord_orth> repxyz;  //!< fast target lists
+    std::vector<clipper::ftype>      reptgt;
+    std::vector<clipper::ftype>      repwgt;
+  };
+
+  //! access to fine sampled target function
+  const Sampled& sampled() const { return slowtgt; }
   //! access to LLK target for load/save
   clipper::NXmap<float>& llk_target() { return target; }
   //! access to LLK weight for load/save
   clipper::NXmap<float>& llk_weight() { return weight; }
-  //! perform 6-d (RT) search for LLK target in given map
-  Score_list<clipper::RTop_orth> search( const clipper::Xmap<float>& xmap, const clipper::ftype& step, const int& nres, const clipper::ftype& dres ) const;
-  //! calculate fast approx to LLK for given orientation
-  clipper::ftype llk_approx( const clipper::Xmap<float>& xmap, const clipper::RTop_orth rtop ) const;
-  //! calculate full LLK for given orientation
-  clipper::ftype llk       ( const clipper::Xmap<float>& xmap, const clipper::RTop_orth rtop ) const;
-  //! output formatted representation
-  clipper::String format() const;
  private:
   clipper::ftype radius;  //!< density sphere radius
   int naccum;             //!< number of maps accumulated
   clipper::NXmap<float> target;  //!< target map
   clipper::NXmap<float> weight;  //!< weight map
-  std::vector<clipper::Coord_orth> repxyz, fullxyz;  //!< fast target lists
-  std::vector<clipper::ftype>      reptgt, fulltgt;
-  std::vector<clipper::ftype>      repwgt, fullwgt;
-};
-
-
-//! Log-likelihood map classifying target
-/*! This class is used in determining classifying some region of a
-  noisy electron density map according to the best log-likelihood fit
-  to one of a set of targets, e.g. for identification of side chains.
-  It contains methods for constructing a list of targets and for
-  identifying which target a particular region of density resembles.
-
-  Targets are identified by an ordinal number, so the nature and the
-  order of the targets is irrelevent.
-
-  This llk_raw returns raw scores, which may be on different scales
-  for each of the targets and so need post-processing, e.g. using a
-  z-score.
-
-  \code
-  LLK_map_classifier llkmcl( 4.0, 0.5, 20 );
-  // accumulate scores for map features in reference map
-  for ( int i = 0; i < ref_rtops.size(); i++ )
-    llkmcl.accumulate( ref_map, ref_rtops[i], res_types[i] );
-  llkmcl.prep_llk()
-  // get the scores for a map feature in the target map 
-  std::vector<double> scores = llkmcl.llk_raw( tgt_map, tgt_rtops[i] );
-  \endcode
-*/
-class LLK_map_classifier {
- public:
-  //! constructor: provide radius and sampling and number of targets
-  LLK_map_classifier( const clipper::ftype& rad, const clipper::ftype& sampling, const int& num_targets );
-  //! accumulate density statistics from a sample orientation in a sample map
-  void accumulate( const clipper::Xmap<float>& xmap, const clipper::RTop_orth rtop, const int& target_type );
-  //! prepare LLK target after accumulating density or loading map
-  void prep_llk();
-  //! calculate raw LLKs for given map location for each target
-  std::vector<clipper::ftype> llk_raw( const clipper::Xmap<float>& xmap, const clipper::RTop_orth rtop ) const;
-  //! direct access to target function for an individual target
-  LLK_map_target& llk_map_target( const int& target_type )
-    { return llktgts[target_type]; }
-  //! number of targets into which features are classified
-  int num_targets() const { return llktgts.size(); }
- private:
-  std::vector<LLK_map_target> llktgts;  //!< the targets
+  Sampled slowtgt, fasttgt;
 };
 
 

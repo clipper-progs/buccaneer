@@ -204,24 +204,26 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
 
   // use threading to extract successive longest chains
   std::vector<std::vector<int> > chns;
-  std::vector<int> chn = longest_chain( joins );
-  while ( chn.size() > 5 ) {
-    // add longest chain to list
-    chns.push_back( chn );
-    // remove used fragments
-    for ( int r = 0; r < chn.size(); r++ )
-      fragments[chn[r]].flag = 0;
-    // remove links from used fragments
-    for ( int f = 0; f < joins.size(); f++ )
-      if ( fragments[f].flag == 0 )
-	joins[f].clear();
-    // and links to used fragments
-    for ( int f = 0; f < joins.size(); f++ )
-      for ( int j = joins[f].size()-1; j >= 0; j-- )
-	if ( fragments[joins[f][j]].flag == 0 )
-	  joins[f].erase( joins[f].begin() + j );
-    // get longest remaining chain
-    chn = longest_chain( joins );
+  { // code block to avoid windows compiler bugs over use of label "chn"
+    std::vector<int> chn = longest_chain( joins );
+    while ( chn.size() > 5 ) {
+      // add longest chain to list
+      chns.push_back( chn );
+      // remove used fragments
+      for ( int r = 0; r < chn.size(); r++ )
+	fragments[chn[r]].flag = 0;
+      // remove links from used fragments
+      for ( int f = 0; f < joins.size(); f++ )
+	if ( fragments[f].flag == 0 )
+	  joins[f].clear();
+      // and links to used fragments
+      for ( int f = 0; f < joins.size(); f++ )
+	for ( int j = joins[f].size()-1; j >= 0; j-- )
+	  if ( fragments[joins[f][j]].flag == 0 )
+	    joins[f].erase( joins[f].begin() + j );
+      // get longest remaining chain
+      chn = longest_chain( joins );
+    }
   }
 
   // now join the fragments
