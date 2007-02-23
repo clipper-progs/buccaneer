@@ -1,14 +1,16 @@
 bin_PROGRAMS = cbuccaneer
 
 cbuccaneer_SOURCES = \
-buccaneer-build.cpp     buccaneer-lib.cpp       cbuccaneer.cpp \
-buccaneer-find.cpp      buccaneer-prot.cpp      simplex-lib.cpp \
-buccaneer-grow.cpp      buccaneer-prune.cpp     simulate-lib.cpp \
-buccaneer-join.cpp      buccaneer-sequence.cpp \
-buccaneer-build.h       buccaneer-lib.h         simplex-lib.h \
-buccaneer-find.h        buccaneer-prot.h        simulate-lib.h \
-buccaneer-grow.h        buccaneer-prune.h \
-buccaneer-join.h        buccaneer-sequence.h
+buccaneer-build.cpp     buccaneer-join.cpp      buccaneer-sequence.cpp \
+buccaneer-correct.cpp   buccaneer-lib.cpp       cbuccaneer.cpp \
+buccaneer-filter.cpp    buccaneer-link.cpp      simplex-lib.cpp \
+buccaneer-find.cpp      buccaneer-prot.cpp      simulate-lib.cpp \
+buccaneer-grow.cpp      buccaneer-prune.cpp \
+buccaneer-build.h       buccaneer-join.h        buccaneer-sequence.h \
+buccaneer-correct.h     buccaneer-lib.h         simplex-lib.h \
+buccaneer-filter.h      buccaneer-link.h        simulate-lib.h \
+buccaneer-find.h        buccaneer-prot.h \
+buccaneer-grow.h        buccaneer-prune.h
 
 
 INCLUDES = $(FFTW_CXXFLAGS) $(MMDB_CXXFLAGS)  $(CCP4_CXXFLAGS) \
