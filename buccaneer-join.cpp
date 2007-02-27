@@ -69,7 +69,7 @@ std::vector<int> Ca_join::longest_chain( std::vector<std::vector<int> >& fwd_ptr
   while ( bck_ptrs[result.back()] >= 0 )
     result.push_back( bck_ptrs[result.back()] );
   // reverse the list
-  reverse( result.begin(), result.end() );
+  std::reverse( result.begin(), result.end() );
   return result;
 }
 

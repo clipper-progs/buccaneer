@@ -196,7 +196,9 @@ int main( int argc, char** argv )
 
   // apply free flag
   clipper::HKL_data<clipper::data32::F_sigF> wrk_f1 = wrk_f;
-  wrk_f1.mask( flag != 0 );
+  //wrk_f1.mask( flag != 0 );
+  for ( clipper::HKL_data_base::HKL_reference_index ih = hkls_wrk.first(); !ih.last(); ih.next() ) if ( flag[ih].flag() == 0 ) wrk_f1[ih] = clipper::data32::F_sigF();  //ugly hack for broken SGI compilers
+
 
   // Get reference model
   clipper::MiniMol mol_ref;
@@ -431,10 +433,6 @@ int main( int argc, char** argv )
 	     mol_wrk[c][r].type() == "+++" || mol_wrk[c][r].type() == "---" )
 	  mol_wrk[c][r].set_type( newresname );
 
-    // adjust residue numbers
-    for ( int c = 0; c < mol_wrk.size(); c++ )
-      if ( c < 26 ) ProteinTools::chain_renumber( mol_wrk[c], seq_wrk );
-
     // write answers
     clipper::MMDBfile mmdb;
     mmdb.export_minimol( mol_wrk );
@@ -442,3 +440,4 @@ int main( int argc, char** argv )
 
   }
 }
+
