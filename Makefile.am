@@ -1,4 +1,4 @@
-bin_PROGRAMS = cbuccaneer
+bin_PROGRAMS = cbuccaneer csequins
 
 cbuccaneer_SOURCES = \
 buccaneer-build.cpp     buccaneer-join.cpp      buccaneer-sequence.cpp \
@@ -11,6 +11,10 @@ buccaneer-correct.h     buccaneer-lib.h         simplex-lib.h \
 buccaneer-filter.h      buccaneer-link.h        simulate-lib.h \
 buccaneer-find.h        buccaneer-prot.h \
 buccaneer-grow.h        buccaneer-prune.h
+
+csequins_SOURCES = \
+csequins.cpp buccaneer-sequence.cpp simulate-lib.cpp buccaneer-prot.cpp \
+buccaneer-lib.cpp
 
 
 INCLUDES = $(FFTW_CXXFLAGS) $(MMDB_CXXFLAGS)  $(CCP4_CXXFLAGS) \

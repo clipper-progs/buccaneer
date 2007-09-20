@@ -111,7 +111,7 @@ VERSION = @VERSION@
 am__include = @am__include@
 am__quote = @am__quote@
 install_sh = @install_sh@
-bin_PROGRAMS = cbuccaneer
+bin_PROGRAMS = cbuccaneer csequins
 
 cbuccaneer_SOURCES = \
 buccaneer-build.cpp     buccaneer-join.cpp      buccaneer-sequence.cpp \
@@ -126,6 +126,11 @@ buccaneer-find.h        buccaneer-prot.h \
 buccaneer-grow.h        buccaneer-prune.h
 
 
+csequins_SOURCES = \
+csequins.cpp buccaneer-sequence.cpp simulate-lib.cpp buccaneer-prot.cpp \
+buccaneer-lib.cpp
+
+
 INCLUDES = $(FFTW_CXXFLAGS) $(MMDB_CXXFLAGS)  $(CCP4_CXXFLAGS) \
 	   -I$(includedir)
 
@@ -137,7 +142,7 @@ subdir = src/buccaneer
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-bin_PROGRAMS = cbuccaneer$(EXEEXT)
+bin_PROGRAMS = cbuccaneer$(EXEEXT) csequins$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS)
 
 am_cbuccaneer_OBJECTS = buccaneer-build.$(OBJEXT) \
@@ -158,6 +163,19 @@ cbuccaneer_DEPENDENCIES = ../../clipper/contrib/libclipper-contrib.la \
 	../../clipper/core/libclipper-core.la \
 	../../clipper/minimol/libclipper-minimol.la
 cbuccaneer_LDFLAGS =
+am_csequins_OBJECTS = csequins.$(OBJEXT) buccaneer-sequence.$(OBJEXT) \
+	simulate-lib.$(OBJEXT) buccaneer-prot.$(OBJEXT) \
+	buccaneer-lib.$(OBJEXT)
+csequins_OBJECTS = $(am_csequins_OBJECTS)
+csequins_LDADD = $(LDADD)
+csequins_DEPENDENCIES = ../../clipper/contrib/libclipper-contrib.la \
+	../../clipper/cif/libclipper-cif.la \
+	../../clipper/mmdb/libclipper-mmdb.la \
+	../../clipper/ccp4/libclipper-ccp4.la \
+	../../clipper/phs/libclipper-phs.la \
+	../../clipper/core/libclipper-core.la \
+	../../clipper/minimol/libclipper-minimol.la
+csequins_LDFLAGS =
 
 DEFS = @DEFS@
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
@@ -176,7 +194,7 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prot.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prune.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-sequence.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/cbuccaneer.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/cbuccaneer.Po ./$(DEPDIR)/csequins.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/simplex-lib.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/simulate-lib.Po
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
@@ -196,9 +214,9 @@ LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-DIST_SOURCES = $(cbuccaneer_SOURCES)
+DIST_SOURCES = $(cbuccaneer_SOURCES) $(csequins_SOURCES)
 DIST_COMMON = Makefile.am Makefile.in
-SOURCES = $(cbuccaneer_SOURCES)
+SOURCES = $(cbuccaneer_SOURCES) $(csequins_SOURCES)
 
 all: all-am
 
@@ -241,6 +259,9 @@ clean-binPROGRAMS:
 cbuccaneer$(EXEEXT): $(cbuccaneer_OBJECTS) $(cbuccaneer_DEPENDENCIES) 
 	@rm -f cbuccaneer$(EXEEXT)
 	$(CXXLINK) $(cbuccaneer_LDFLAGS) $(cbuccaneer_OBJECTS) $(cbuccaneer_LDADD) $(LIBS)
+csequins$(EXEEXT): $(csequins_OBJECTS) $(csequins_DEPENDENCIES) 
+	@rm -f csequins$(EXEEXT)
+	$(CXXLINK) $(csequins_LDFLAGS) $(csequins_OBJECTS) $(csequins_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT) core *.core
@@ -260,6 +281,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prune.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-sequence.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cbuccaneer.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/csequins.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simplex-lib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simulate-lib.Po@am__quote@
 
