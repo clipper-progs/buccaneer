@@ -36,7 +36,7 @@ target_fn, const std::vector<std::vector<double> >& args ) const
 
   // simplex loop
   int iw, ib;
-  double f1(0.0), f2(0.0);
+  double f0(0.0), f1(0.0), f2(0.0);
   for ( int cyc = 0; cyc < max_cycles_; cyc++ ) {
     if ( debug_mode )  // DEBUG OUTPUT
       for ( int i = 0; i < params.size(); i++ ) {
@@ -80,8 +80,8 @@ target_fn, const std::vector<std::vector<double> >& args ) const
     }
     f1 = target_fn( t1 );
     // simplex conditions
-    if ( !clipper::Util::is_nan( f1 ) ) {
-      if ( f1 < fn[iw] ) {  // new point is better than worst
+    if ( !clipper::Util::is_nan( f1 ) ) { // new point is valid
+      if ( f1 < fn[iw] ) {    // new point is better than worst
         if ( f1 < fn[ib] ) {  // new point is better than best
           f2 = target_fn( t2 );
           if ( !clipper::Util::is_nan( f2 ) ) {
@@ -97,7 +97,17 @@ target_fn, const std::vector<std::vector<double> >& args ) const
           params[iw] = t1; fn[iw] = f1;             // normal step
         }
       } else {  // normal step is worse
-        params[iw] = t0; fn[iw] = target_fn( t0 );  // contraction
+	f0 = target_fn( t0 );  // contraction
+	if ( f0 < fn[iw] ) {   // contraction is better than worst
+	  params[iw] = t0; fn[iw] = f0;
+	} else {               // otherwise contract all towards best
+	  for ( int i = 0; i < params.size(); i++ )
+	    if ( i != ib ) {
+	      for ( int j = 0; j < size; j++ )
+		params[i][j] = 0.5 * ( params[i][j] + params[ib][j] );
+	      fn[i] = target_fn( params[i] );
+	    }
+        }
       }
     } else {  // normal step is invalid
       params[iw] = t0; fn[iw] = target_fn( t0 );    // contraction
@@ -105,7 +115,8 @@ target_fn, const std::vector<std::vector<double> >& args ) const
     if ( debug_mode )  // DEBUG OUTPUT
       if      ( fn[iw] == f2 ) std::cout << "Extn-step\n";
       else if ( fn[iw] == f1 ) std::cout << "Nrml-step\n";
-      else                     std::cout << "Ctrn-step\n";
+      else if ( fn[iw] == f0 ) std::cout << "Ctrn-step\n";
+      else                     std::cout << "Ctrx-step\n";
   }
   return params[ib];
 }

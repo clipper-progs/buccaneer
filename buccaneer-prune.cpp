@@ -26,7 +26,9 @@ bool Ca_prune::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1
       // find any clashing residues between these chains
       for ( int res1 = 0; res1 < moltmp[chn1].size(); res1++ ) {
 	for ( int res2 = 0; res2 < moltmp[chn2].size(); res2++ ) {
-	  if ( chn1 != chn2 || res1 != res2 ) {
+	  if ( ( chn1 != chn2 || res1 != res2 ) && 
+	       moltmp[chn1][res1].type() != "~~~" &&
+	       moltmp[chn2][res2].type() != "~~~" ) {
 	    int a1 = moltmp[chn1][res1].lookup( " CA ", clipper::MM::ANY );
 	    int a2 = moltmp[chn2][res2].lookup( " CA ", clipper::MM::ANY );
 	    if ( a1 >= 0 && a2 >= 0 ) {
@@ -38,10 +40,8 @@ bool Ca_prune::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1
 		//              otherwise keep the longer.
 		int scr1 = moltmp[chn1].size();
 		int scr2 = moltmp[chn2].size();
-		if ( moltmp[chn1][res1].type() == "~~~" ) scr1 =  -1000;
-		if ( moltmp[chn1][res1].type() == "UNK" ) scr1 += -1000;
-		if ( moltmp[chn2][res2].type() == "~~~" ) scr2 =  -1000;
-		if ( moltmp[chn2][res2].type() == "UNK" ) scr2 += -1000;
+		if ( moltmp[chn1][res1].type() == "UNK" ) scr1 += -1000000;
+		if ( moltmp[chn2][res2].type() == "UNK" ) scr2 += -1000000;
 		if ( scr1 > scr2 ) moltmp[chn2][res2].set_type( "~~~" );
 		else               moltmp[chn1][res1].set_type( "~~~" );
 	      }

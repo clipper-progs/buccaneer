@@ -250,7 +250,7 @@ std::vector<clipper::Coord_orth> ProteinLoop::constrained_coords( const clipper:
 
 // Protein tools
 
-clipper::String ProteinTools::chain_sequence( clipper::MPolymer& mp )
+clipper::String ProteinTools::chain_sequence( const clipper::MPolymer& mp )
 {
   clipper::String seq = "";
   for ( int res = 0; res < mp.size(); res++ ) {
@@ -268,7 +268,7 @@ clipper::String ProteinTools::chain_sequence( clipper::MPolymer& mp )
 }
 
 
-bool ProteinTools::chain_renumber( clipper::MPolymer& pol, const clipper::MMoleculeSequence& seq )
+std::pair<int,int> ProteinTools::chain_sequence_match( const clipper::String& chnseq, const clipper::MMoleculeSequence& seq )
 {
   // convert sequences to unique strings
   std::vector<clipper::String> seqs( seq.size() );
@@ -278,27 +278,50 @@ bool ProteinTools::chain_renumber( clipper::MPolymer& pol, const clipper::MMolec
       s += residue_code_1( residue_index( seq[chn].sequence().substr(res,1) ) );
     seqs[chn] = s;
   }
-  // prepare sequence
-  int res0, res1;
-  for ( res0 =    0; res0 < pol.size(); res0++ )
-    if ( residue_index( pol[res0].type() ) >= 0 ) break;
-  for ( res1 = res0; res1 < pol.size(); res1++ )
-    if ( residue_index( pol[res1].type() ) <  0 ) break;
-  clipper::String chnseq = "";
-  for ( int res = res0; res < res1; res++ )
-    chnseq += residue_code_1( residue_index( pol[res].type() ) );
-  // find in source sequences
-  if ( chnseq.length() > 5 ) {
-    for ( int c = 0; c < seqs.size(); c++ ) {
-      int res2 = seqs[c].find( chnseq );
-      if ( res2 != std::string::npos ) {
-        int off = res2 - res0 + 1;
-        for ( int res = 0; res < pol.size(); res++ )
-          pol[res].set_seqnum( res + off );
+  // set minimum match threshold
+  int minscr = 0;
+  for ( int i = 0; i < chnseq.size(); i++ )
+    if ( isupper(chnseq[i]) ) minscr++;
+  minscr = minscr/3+4;
+  // now find best match
+  int bestchn = -1;
+  int bestoff = -1;
+  int bestscr = minscr;
+  int lenc = chnseq.length();
+  for ( int chn = 0; chn < seqs.size(); chn++ ) {
+    int lens = seqs[chn].length();
+    for ( int off = -lenc+bestscr; off < lens-bestscr; off++ ) {
+      int scr = 0;
+      for ( int i = 0; i < seqs[chn].length(); i++ )
+	if ( i-off >= 0 && i-off < chnseq.length() )
+	  if ( seqs[chn][i] == chnseq[i-off] )
+	    if ( isupper(chnseq[i-off]) )
+	      scr++;
+      if ( scr > bestscr ) {
+	bestchn = chn;
+	bestoff = off;
+	bestscr = scr;
       }
     }
   }
-  return true;
+  // if ( bestchn >= 0 ) { clipper::String tmp = "???????????????????????????????????????????????????????????????????????????????????????????????????"+seqs[bestchn]+"???????????????????????????????????????????????????????????????????????????????????????????????????"; std::cout << tmp.substr( bestoff+99, chnseq.length() ) << "\n"; }
+  // return best match
+  return std::pair<int,int>( bestchn, bestoff );
+}
+
+
+bool ProteinTools::chain_renumber( clipper::MPolymer& pol, const clipper::MMoleculeSequence& seq )
+{
+  std::pair<int,int> match = chain_sequence_match( chain_sequence(pol), seq );
+  int chn = match.first;
+  int off = match.second;
+  if ( chn >= 0 ) {
+    for ( int res = 0; res < pol.size(); res++ )
+      pol[res].set_seqnum( res + off + 1 );
+    return true;
+  } else {
+    return false;
+  }
 }
 
 

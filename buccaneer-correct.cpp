@@ -116,12 +116,15 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
       int ins2 = seq0.find_first_not_of( "+", ins1 );
       int nins = ins2 - ins1;
       int len = mpwrk.size();
+      if ( ins2 == std::string::npos ) break;
       // pick a range of positions to modify
       int r1, r2;
-      for ( r1 = ins1-1; r1 > ins1-offset; r1-- )
-	if ( seq0[r1] == '?' || r1 <= buffer               ) break;
-      for ( r2 = ins2;  r2 <= ins2+offset; r2++ )
-	if ( seq0[r2] == '?' || r2 >= seq0.length()-buffer ) break;
+      int o1 = clipper::Util::max(ins1-offset,0);
+      int o2 = clipper::Util::min(ins2+offset,int(seq0.length())-1);
+      for ( r1 = ins1-1; r1 >  o1; r1-- ) if ( seq0[r1] == '?' ) break;
+      for ( r2 = ins2;   r2 <= o2; r2++ ) if ( seq0[r2] == '?' ) break;
+      r1 = clipper::Util::max( r1, buffer );
+      r2 = clipper::Util::min( r2, int(seq0.length())-buffer );
       // OPTIMISATION: mask the sequence
       for ( int r = 0; r < mpwrk.size(); r++ )
 	if ( r < r1-2 || r > r2+2 ) mpwrk[r].set_type( mpwrk[r].type() + "*" );
@@ -172,6 +175,7 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
       int del2 = seq0.find_first_not_of( "-", del1 );
       int ndel = del2 - del1;
       int len = mpwrk.size();
+      if ( del2 == std::string::npos ) break;
       // look for the missing sequence elements in the sequence data
       int i1, i2, f1, f2, e1, e2;
       for ( i1 = del1-1;   i1 > 0; i1-- ) if ( seq0[i1-1] == '?' ) break;
@@ -192,10 +196,12 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
       seqx += "????????";
       // pick a range of positions to modify
       int r1, r2;
-      for ( r1 = del1-1; r1 > del1-offset; r1-- )
-	if ( seq0[r1] == '?' || r1 <= buffer               ) break;
-      for ( r2 = del2;  r2 <= del2+offset; r2++ )
-	if ( seq0[r2] == '?' || r2 >= seq0.length()-buffer ) break;
+      int o1 = clipper::Util::max(del1-offset,0);
+      int o2 = clipper::Util::min(del2+offset,int(seq0.length())-1);
+      for ( r1 = del1-1; r1 >  o1; r1-- ) if ( seq0[r1] == '?' ) break;
+      for ( r2 = del2;   r2 <= o2; r2++ ) if ( seq0[r2] == '?' ) break;
+      r1 = clipper::Util::max( r1, buffer );
+      r2 = clipper::Util::min( r2, int(seq0.length())-buffer );
       // OPTIMISATION: mask the sequence
       for ( int r = 0; r < mpwrk.size(); r++ )
 	if ( r < r1-2 || r > r2+2 ) mpwrk[r].set_type( mpwrk[r].type() + "*" );
@@ -244,6 +250,8 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
     // store the chain again
     mol2[chn] = mpwrk;
   }  // next chain
+
+  return true;
 }
 
 

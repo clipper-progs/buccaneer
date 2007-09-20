@@ -140,7 +140,8 @@ class ProteinTools {
   static clipper::String residue_code_3( int index );
   static clipper::String residue_code( clipper::String code, bool translate=true );
   static clipper::String residue_codes() { return clipper::String( "ARNDCQEGHILKMFPSTWYV" ); }
-  static clipper::String chain_sequence( clipper::MPolymer& mp );
+  static clipper::String chain_sequence( const clipper::MPolymer& mp );
+  static std::pair<int,int> chain_sequence_match( const clipper::String& chnseq, const clipper::MMoleculeSequence& seq );
   static bool chain_renumber( clipper::MPolymer& pol, const clipper::MMoleculeSequence& seq );
   static bool chain_tidy( clipper::MiniMol& target, const clipper::MiniMol& source );
   static bool copy_residue_types( clipper::MiniMol& target, const clipper::MiniMol& source );

@@ -10,7 +10,7 @@
   filled by accumulation or by loading the target and weight.
   \param rad Radius in which LLK function will be used, in Angstroms.
   \param sampling Sampling spacing for the LLK function, in Angstroms. */
-void LLK_map_target::init( const clipper::ftype& rad, const clipper::ftype& sampling )
+void LLK_map_target::init( const clipper::ftype& rad, const clipper::ftype& sampling, TYPE type )
 {
   radius = rad;
 
@@ -25,6 +25,13 @@ void LLK_map_target::init( const clipper::ftype& rad, const clipper::ftype& samp
 
   target.init( grid, rtop );
   weight.init( grid, rtop );
+
+  type_ = type;
+  fasttgt.set_type( type );
+  slowtgt.set_type( type );
+
+  tgt_scl = 1.0;
+  tgt_off = 0.0;
 
   naccum = 0;  // number of samples
 }

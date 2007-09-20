@@ -18,7 +18,7 @@ int Ca_sequence::tag = 0;
 //}
 
 // approximate cumulative normal distribution function
-double phi_approx( double z )
+double Ca_sequence::phi_approx( double z )
 {
   double p;
   if ( z < 0.0 )
@@ -115,14 +115,22 @@ std::pair<double,std::pair<int,int> > Ca_sequence::sequence_score( const std::ve
   // accumulate scores
   std::vector<double> score( scores.size() );
   for ( int r = 0; r < scores.size(); r++ ) {
-    int t = ProteinTools::residue_index( subseq.substr( r, 1 ) );
-    if ( t >= 0 ) score[r] = scores[r][t];  // add residue z-score
-    else          score[r] = 0.0;           // or a penalty of +0.0
+    score[r] = 0.0;    // UNK or unknown type
+    if ( subseq[r] == '+' || subseq[r] == '-' ) {
+      score[r] = 3.0;  // insertion/deletion penalty
+    } else {
+      int t = ProteinTools::residue_index( subseq.substr( r, 1 ) );
+      if ( t >= 0 ) score[r] = scores[r][t];  // add residue z-score
+    }
   }
   // calculate cumulative score
-  std::vector<double> sccum( scores.size()+1 );
+  std::vector<double> sccum( scores.size()+1 ), scwt( scores.size()+1 );
   sccum[0] = 0.0;
   for ( int r = 0; r < score.size(); r++ ) sccum[r+1] = sccum[r]+score[r];
+  for ( int r = 0; r < scwt.size(); r++ ) {
+    double l1 = double(r)/50.0;
+    scwt[r] = 1.0/pow(1.0+l1*l1,0.25);
+  }
   // now find grestest subsequence score
   int minseq = 1;
   int r1min = 0;
@@ -130,8 +138,8 @@ std::pair<double,std::pair<int,int> > Ca_sequence::sequence_score( const std::ve
   double scmin = 0.0;
   for ( int r1 = 0; r1 < sccum.size()-minseq; r1++ )
     for ( int r2 = r1+minseq; r2 < sccum.size(); r2++ ) {
-      double l1 = ( r2 - r1 )/50.0;  // downweight very long sequences
-      double sc = ( sccum[r2]-sccum[r1] ) / pow( 1.0+l1*l1 , 0.25 );
+      // double sc = (sccum[r2]-sccum[r1]) + 1.5*sqrt( double(r2-r1+1 ) );
+      double sc = ( sccum[r2]-sccum[r1] ) * scwt[r2-r1];
       if ( sc < scmin ) { r1min = r1; r2min = r2; scmin = sc; }
     }
   std::pair<double,std::pair<int,int> > result;
@@ -142,100 +150,173 @@ std::pair<double,std::pair<int,int> > Ca_sequence::sequence_score( const std::ve
 }
 
 
+/*! Perform sequence alignment between the given chain scores and the
+  given sequence. */
+std::vector<clipper::String> Ca_sequence::sequence_align( const std::vector<std::vector<double> >& scores, const clipper::String& seq )
+{
+  // set up data structures
+  int n = scores.size();
+  int m = seq.length();
+  std::vector<clipper::String> result;
+  if ( n < 3 || m < 3 ) return result;
+
+  // construct a sequence alignment matrix from the sequencing data
+  clipper::Matrix<double> s(m,n), c(m,n);
+  for ( int i = 0; i < m; i++ ) {
+    int t = ProteinTools::residue_index( seq.substr(i,1) );
+    for ( int j = 0; j < n; j++ ) s(i,j) = scores[j][t];
+  }
+
+  // now make the cumulative matrix and the back pointers
+  clipper::Matrix<int> b(m,n,0), e(m,n,0);
+  // set up first row and column
+  for ( int i = 0; i < m; i++ ) c(i,0) = s(i,0);
+  for ( int j = 0; j < n; j++ ) c(0,j) = s(0,j);
+  // set up second and third rows
+  for ( int i = 1; i < m; i++ ) c(i,1) = c(i-1,0) + s(i,1);
+  for ( int j = 1; j < n; j++ ) c(1,j) = c(0,j-1) + s(1,j);
+  for ( int j = 1; j < n; j++ ) c(2,j) = c(1,j-1) + s(2,j);
+  // now fill the rest of the matrix
+  for ( int i = 3; i < m; i++ )
+    for ( int j = 2; j < n; j++ ) {
+      double s0 = c(i-1,j-1) + s(i,j);
+      double s1 = c(i-1,j-2) + s(i,j) + 3.0;
+      double s2 = c(i-3,j-2) + s(i,j) + 3.0;
+      if ( s0 <= s1 && s0 <= s2 ) {  // sequence follows on
+	c(i,j) = s0;
+	b(i,j) = 0;
+	e(i-1,j-1) = 1;
+      } else if ( s1 <= s2 ) {       // skip a residue in chain
+	c(i,j) = s1;
+	b(i,j) = 1;
+	e(i-1,j-2) = 1;
+      } else {                       // skip a residue in sequence
+	c(i,j) = s2;
+	b(i,j) = 2;
+	e(i-3,j-2) = 1;
+      }
+    }
+
+  // make a list of candidate sequences
+  for ( int i = 3; i < m; i++ )
+    for ( int j = 2; j < n; j++ )
+      if ( e(i,j) == 0 ) {  // if this is a sequence end
+	std::vector<char> seqv(n,'?');
+	int i1 = i;
+	int j1 = j;
+	while ( i1 >= 0 && j1 >= 0 ) {
+	  seqv[j1] = seq[i1];
+	  if ( b(i1,j1) == 1 ) {
+	    seqv[j1-1] = '+';
+	    i1 = i1 - 1;
+	    j1 = j1 - 2;
+	  } else if ( b(i1,j1) == 2 ) {
+	    seqv[j1-1] = '-';
+	    i1 = i1 - 3;
+	    j1 = j1 - 2;
+	  } else {
+	    i1 = i1 - 1;
+	    j1 = j1 - 1;
+	  }
+	}
+	std::string seqs( seqv.begin(), seqv.end() );
+	result.push_back( seqs );
+      }
+
+  /*
+  // diagnostics
+  Score_list<clipper::String> scrs( 3 );
+  for ( int i = 0; i < result.size(); i++ ) {
+    std::pair<double,std::pair<int,int> > scr;
+    scr = sequence_score( scores, result[i] );
+    scrs.add( scr.first, result[i] );
+  }
+  std::cout << "DEBUG " << result.size() << " " << scrs.size() << std::endl;
+  for ( int i = 0; i < clipper::Util::min(int(scrs.size()),3); i++ )
+    std::cout << i << "\t" << scrs.score(i) << "\t" << scrs[i] << std::endl;
+  */
+
+  // return the sequences for scoring
+  return result;
+}
+
+
 /*! Return a scored list of sequence matches between a set of LLK
   scores and available sequence ranges. */
 Score_list<clipper::String> Ca_sequence::sequence_match( const std::vector<std::vector<double> >& scores, const clipper::MMoleculeSequence& seq )
 {
-  // prepare data for partial sequence match
+  // loop over chains and get possible alignments
+  std::vector<std::pair<double,clipper::String> > matches_tmp;
   clipper::String nulseq = std::string( scores.size(), '?' );
-  int minoff = 5;
-  // find the best match of this chain against the sequence
-  std::pair<double,std::pair<int,int> > result, result_tmp;
-  Score_list<std::pair<int,int> > matches_off(100);
   for ( int seqchn = 0; seqchn < seq.size(); seqchn++ ) {
-    clipper::String chnseq = nulseq + seq[seqchn].sequence() + nulseq;
-    int maxoff = chnseq.length()-scores.size();
-    for ( int seqoff = minoff; seqoff <= maxoff-minoff; seqoff++ ) {
-      // score the whole sequence
-      clipper::String subseq = chnseq.substr( seqoff, scores.size() );
-      result = sequence_score( scores, subseq );
-      matches_off.add( result.first, std::pair<int,int>(seqchn,seqoff) );
+    // get possible alignments
+    std::vector<clipper::String> seqtmp = 
+      sequence_align( scores, seq[seqchn].sequence() );
+    // score alignments and add to list
+    for ( int i = 0; i < seqtmp.size(); i++ ) {
+      // get truncated alignment
+      clipper::String subseq = seqtmp[i];
+      std::pair<double,std::pair<int,int> > result_tmp =
+	sequence_score( scores, subseq );
+      // truncate
+      int r1 = result_tmp.second.first;
+      int r2 = result_tmp.second.second;
+      double scrb = result_tmp.first;
+      clipper::String seqb = nulseq.substr(0,r1)+subseq.substr(r1,r2-r1)+nulseq.substr(r2);
+      // store
+      std::pair<double,clipper::String> match( scrb, seqb );
+      matches_tmp.push_back( match );
     }
   }
-
-  // refine the matches by insertion and deletion
-  Score_list<clipper::String> matches_tmp(200);
-  for ( int i = 0; i < matches_off.size(); i++ ) {
-    int seqchn = matches_off[i].first;
-    int seqoff = matches_off[i].second;
-    clipper::String chnseq = nulseq + seq[seqchn].sequence() + nulseq;
-
-    // try the unmutated sequence
-    clipper::String subseq = chnseq.substr( seqoff, scores.size() );
-    result_tmp = sequence_score( scores, subseq );
-    int r1 = result_tmp.second.first;
-    int r2 = result_tmp.second.second;
-    double scrb = result_tmp.first;
-    clipper::String seqb =
-      nulseq.substr(0,r1)+subseq.substr(r1,r2-r1)+nulseq.substr(r2);
-
-    // make a list of candidate chain mutations
-    std::vector<clipper::String> seqmut;
-    // insertions
-    for ( int j = r1+minoff; j < r2-minoff; j++ ) {
-      subseq = chnseq.substr(seqoff,j)+"+"+chnseq.substr(seqoff+j);
-      for ( int k = 0; k <= 1; k++ )
-	seqmut.push_back( subseq.substr( k, scores.size() ) );
-    }
-    // deletions
-    for ( int j = r1+minoff; j < r2-minoff; j++ ) {
-      subseq = chnseq.substr(seqoff,j)+"-"+chnseq.substr(seqoff+j+2);
-      for ( int k = 0; k <= 1; k++ )
-	seqmut.push_back( subseq.substr( k, scores.size() ) );
-    }
-
-    // and try them out
-    for ( int j = 0; j < seqmut.size(); j++ ) {
-      result_tmp = sequence_score( scores, seqmut[j] );
-      double scr = result_tmp.first + 3.0;
-      int s1 = result_tmp.second.first;
-      int s2 = result_tmp.second.second;
-      if ( scr < scrb && s1 <= r1 && s2 >= r2 ) {
-	scrb = scr;
-	seqb = nulseq.substr(0,s1)+seqmut[j].substr(s1,s2-s1)+nulseq.substr(s2);
-      }
-    }
-
-    // add the best mutation
-    matches_tmp.add( scrb, seqb );
-  }
+  std::sort( matches_tmp.begin(), matches_tmp.end() );
 
   // eliminate any duplicates
   Score_list<clipper::String> matches(50);
-  for ( int i = 0; i < matches_tmp.size(); i++ ) {
-    bool clash = false;
-    for ( int j = 0; j < matches.size(); j++ )
-      if ( sequence_similarity( matches[j], matches_tmp[i] ) > 0.25 )
-	clash = true;
-    if ( !clash )
-      matches.add( matches_tmp.score(i), matches_tmp[i] );
+  for ( int i = 0; i < matches_tmp.size(); i++ )
+    if ( matches.addable( matches_tmp[i].first ) ) {
+      bool clash = false;
+      for ( int j = 0; j < matches.size(); j++ )
+	if ( sequence_similarity( matches[j], matches_tmp[i].second ) > 0.25 )
+	  clash = true;
+      if ( !clash )
+	matches.add( matches_tmp[i].first, matches_tmp[i].second );
+    }
+
+  // if first sequence is labelled, add the unmodified chain too.
+  // (For use in sequins)
+  if ( seq[0].id() == "TEST" && matches.size() > 0 ) {
+    clipper::String s0 = seq[0].sequence();
+    clipper::String s1 = matches[0];
+    if ( s0.length() == s1.length() ) {
+      int nmiss = 0;  // check that unmodified chain is different
+      for ( int i = 0; i < s0.length(); i++ )
+	if ( isupper( s1[i] ) && s1[i] != s0[i] ) nmiss++;
+      if ( nmiss > 0 ) {
+	std::pair<double,std::pair<int,int> > result_tmp =
+	  sequence_score( scores, s0 );
+	matches.add( result_tmp.first, s0 );
+      }
+    }
   }
 
+  // return result
   return matches;
 }
 
 
 /*! Sequence a chain based on the map LLK target, and available
   sequence ranges. */
-Score_list<clipper::String> Ca_sequence::sequence_chain( const clipper::MChain& chain, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llktarget, const clipper::MMoleculeSequence& seq, TYPE type )
+Score_list<clipper::String> Ca_sequence::sequence_chain( const clipper::MChain& chain, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llktarget, const clipper::MMoleculeSequence& seq )
 {
   typedef clipper::MMonomer Mm;
+  int nres = chain.size();
+  int ntyp = llktarget.size();
 
   // for each chain, classify each residue against the density
   clipper::Coord_orth coord_n, coord_ca, coord_c;
   std::vector<std::vector<double> > scores;
-  for ( int res = 0; res < chain.size(); res++ ) {
-    std::vector<double> scores_type( llktarget.size(), 0.0 );
+  for ( int res = 0; res < nres; res++ ) {
+    std::vector<double> scores_type( ntyp, 0.0 );
     // find ca, c, n
     int index_n  = chain[res].lookup( " N  ", clipper::MM::ANY );
     int index_ca = chain[res].lookup( " CA ", clipper::MM::ANY );
@@ -246,29 +327,48 @@ Score_list<clipper::String> Ca_sequence::sequence_chain( const clipper::MChain& 
       coord_ca = chain[res][index_ca].coord_orth();
       coord_c  = chain[res][index_c].coord_orth();
       Ca_group ca( coord_n, coord_ca, coord_c );
-      if ( type == NORMAL )
-	for ( int t = 0; t < llktarget.size(); t++ )
-	  scores_type[t] = llktarget[t].llk( xmap, ca.rtop_beta_carbon() );
-      else
-	for ( int t = 0; t < llktarget.size(); t++ )
-	  scores_type[t] = llktarget[t].correl( xmap, ca.rtop_beta_carbon() );
+      for ( int t = 0; t < ntyp; t++ )
+	scores_type[t] = llktarget[t].target( xmap, ca.rtop_beta_carbon() );
     }
     scores.push_back( scores_type );
   }
 
+  // normalise across rows by mean with moving average
+  std::vector<double> rscores( nres, 0.0 );
+  for ( int r = 0; r < nres; r++ ) {
+    for ( int t = 0; t < ntyp; t++ )
+      rscores[r] += scores[r][t];
+    rscores[r] /= double( ntyp );
+  }
+  // calc cummulative values
+  std::vector<double> rcum( nres+1, 0.0 );
+  for ( int r = 0; r < nres; r++ )
+    rcum[r+1] = rscores[r] + rcum[r];
+  // calc moving average
+  int dr = 5;  // nres / 5 + 1;
+  for ( int r = 0; r < nres; r++ ) {
+    int r1 = clipper::Util::max( r - dr    ,    0 );
+    int r2 = clipper::Util::min( r + dr + 1, nres );
+    rscores[r] = ( rcum[r2] - rcum[r1] ) / double( r2 - r1 );
+  }
+  // and correct
+  for ( int r = 0; r < nres; r++ )
+    for ( int t = 0; t < ntyp; t++ )
+      scores[r][t] = scores[r][t] - rscores[r];
+
   // normalise down columns by mean and variance to get z-scores
   double s0, s1, s2;
-  s0 = double( scores.size() );
-  for ( int t = 0; t < llktarget.size(); t++ ) {
+  s0 = double( nres );
+  for ( int t = 0; t < ntyp; t++ ) {
     s1 = s2 = 0.0;
-    for ( int r = 0; r < scores.size(); r++ ) {
+    for ( int r = 0; r < nres; r++ ) {
       s1 += scores[r][t];
       s2 += scores[r][t]*scores[r][t];
     }
     s1 /= s0;
     s2 /= s0;
     s2 = sqrt( s2 - s1*s1 );
-    for ( int r = 0; r < scores.size(); r++ )
+    for ( int r = 0; r < nres; r++ )
       scores[r][t] = ( scores[r][t] - s1 ) / s2;
   }
 
@@ -366,7 +466,7 @@ bool Ca_sequence::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& m
   num_seq = 0;
 
   // now loop over chains
-  for ( int chn = 0; chn < mol2.size(); chn++ ) {
+  for ( int chn = 0; chn < mol2.size(); chn++ ) if ( mol2[chn].size() > 5 ) {
     // calculate possible matches to this chain
     Score_list<clipper::String> matches =
       sequence_chain( mol2[chn], xmap, llksample, seq );
@@ -447,7 +547,8 @@ clipper::String Ca_sequence::History::format( const clipper::MiniMol& mol ) cons
     for ( int c = 0; c < mol.size(); c++ )
       for ( int r = 0; r < mol[c].size(); r++ ) {
 	if ( mol[c][r].exists_property("TAG") ) {
-	  int t = dynamic_cast<const clipper::Property<int>&>(mol[c][r].get_property("TAG")).value();
+	  // MS compiler bug workaround: should be dynamic_cast
+	  int t = static_cast<const clipper::Property<int>&>(mol[c][r].get_property("TAG")).value();
 	  if ( t == tag ) ids.insert( mol[c].id() );
 	}
       }

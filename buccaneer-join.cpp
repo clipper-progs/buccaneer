@@ -19,9 +19,6 @@ struct Tri_residue {
 std::vector<int> Ca_join::longest_chain( std::vector<std::vector<int> >& fwd_ptrs ) {
   // first make a list of loop starts
   std::vector<int> node_count( fwd_ptrs.size(), 0 );
-  for ( int i = 0; i < fwd_ptrs.size(); i++ )
-    for ( int j = 0; j < fwd_ptrs[i].size(); j++ )
-      node_count[ fwd_ptrs[i][j] ] = -1;
   // loop starts are now marks as 0
   // declare a list of 'dirty' nodes
   std::set<int> dirty;
@@ -44,7 +41,7 @@ std::vector<int> Ca_join::longest_chain( std::vector<std::vector<int> >& fwd_ptr
 	int back_node_next;
 	while ( bck_ptrs[back_node] >= 0 ) {
 	  back_node_next = bck_ptrs[back_node];
-	  if ( back_node == next_node ) break;
+	  if ( back_node_next == next_node ) break;
 	  if ( node_count[back_node_next] >= node_count[back_node] ) break;
 	  back_node = back_node_next;
 	}
@@ -65,15 +62,21 @@ std::vector<int> Ca_join::longest_chain( std::vector<std::vector<int> >& fwd_ptr
       node_max = i;
   // and back-trace
   std::vector<int> result;
-  result.push_back( node_max );
-  while ( bck_ptrs[result.back()] >= 0 )
-    result.push_back( bck_ptrs[result.back()] );
+  int node = node_max;
+  result.push_back( node );
+  while ( bck_ptrs[node] >= 0 ) {
+    int next = bck_ptrs[node];
+    bck_ptrs[node] = -1;
+    node = next;
+    result.push_back( node );
+  }
   // reverse the list
   std::reverse( result.begin(), result.end() );
   return result;
 }
 
 
+// build chains by merging and joining tri-residue fragments
 bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 ) const
 {
   typedef clipper::MMonomer Mm;
@@ -110,8 +113,6 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
   // create 3-residue segments
   std::vector<Tri_residue> fragments;
   Tri_residue fragment;
-  fragment.score = 1.0;
-  fragment.flag = 1;
   for ( int chn = 0; chn < mol1.size(); chn++ ) {
     for ( int res = 1; res < mol1[chn].size()-1; res++ ) {
       if ( Mm::protein_peptide_bond( mol1[chn][res-1], mol1[chn][res] ) &&
@@ -140,6 +141,19 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
 	  fragment.res[2][0] = mol1[chn][res+1][n2].coord_orth();
 	  fragment.res[2][1] = mol1[chn][res+1][a2].coord_orth();
 	  fragment.res[2][2] = mol1[chn][res+1][c2].coord_orth();
+	  fragment.flag = 1;
+	  fragment.score = 1.0;
+	  // upweight sequenced fragments, and flag core seqeunced regions.
+	  if ( mol2[chn][res].type() != "UNK" ) {
+	    int r1, r2;
+	    for ( r1 = res-1; r1 >= 0; r1-- )
+	      if ( mol2[chn][r1].type() == "UNK" ) break;
+	    for ( r2 = res+1; r2 < mol2[chn].size(); r2++ )
+	      if ( mol2[chn][r2].type() == "UNK" ) break;
+	    int d = clipper::Util::min( res-r1, r2-res );
+	    fragment.score += 0.1 * double(d);  // upweight sequenced
+	    if ( d > 15 ) fragment.flag = 2;    // flag core sequenced
+	  }
 	  fragments.push_back( fragment );
 	} // if mainchain atoms present
       } // if connected residues
@@ -152,55 +166,70 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
     clipper::Coord_frac cx1 = fragments[f1].res[1][1].coord_frac(cell);
     clipper::Coord_frac cx2 = fragments[f1].res[2][1].coord_frac(cell);
     for ( int f2 = f1+1; f2 < fragments.size(); f2++ ) {
-      clipper::Coord_frac cy0 = fragments[f2].res[0][1].coord_frac(cell);
-      clipper::Coord_frac cy1 = fragments[f2].res[1][1].coord_frac(cell);
-      clipper::Coord_frac cy2 = fragments[f2].res[2][1].coord_frac(cell);
-      cy0 = cy0.symmetry_copy_near( spgr, cell, cx1 );
-      cy1 = cy1.symmetry_copy_near( spgr, cell, cx1 );
-      cy2 = cy2.symmetry_copy_near( spgr, cell, cx1 );
-      if ( fragments[f2].score > 0.0 &&
-	   ( cy0 - cx0 ).lengthsq(cell) < r2merg &&
-	   ( cy1 - cx1 ).lengthsq(cell) < r2merg &&
-	   ( cy2 - cx2 ).lengthsq(cell) < r2merg ) {
-	clipper::ftype s1 = fragments[f1].score / (fragments[f1].score+1.0);
-	clipper::ftype s2 =                 1.0 / (fragments[f1].score+1.0);
-	for ( int r = 0; r < 3; r++ )
-	  for ( int a = 0; a < 3; a++ ) {
-	    cy1 = fragments[f2].res[r][a].coord_frac(cell);
-	    cy1 = cy1.symmetry_copy_near( spgr, cell, cx1 );
-	    fragments[f1].res[r][a] =
-	      s1 * fragments[f1].res[r][a] + s2 * ( cy1.coord_orth(cell) );
-	  }
-	fragments[f1].score += fragments[f2].score;
-	fragments[f2].score = 0.0;
-	fragments[f2].flag = 0;
+      if ( fragments[f1].flag == 1 && fragments[f2].flag == 1 ) {
+	clipper::Coord_frac cy0 = fragments[f2].res[0][1].coord_frac(cell);
+	clipper::Coord_frac cy1 = fragments[f2].res[1][1].coord_frac(cell);
+	clipper::Coord_frac cy2 = fragments[f2].res[2][1].coord_frac(cell);
+	cy0 = cy0.symmetry_copy_near( spgr, cell, cx1 );
+	cy1 = cy1.symmetry_copy_near( spgr, cell, cx1 );
+	cy2 = cy2.symmetry_copy_near( spgr, cell, cx1 );
+	if ( ( cy0 - cx0 ).lengthsq(cell) < r2merg &&
+	     ( cy1 - cx1 ).lengthsq(cell) < r2merg &&
+	     ( cy2 - cx2 ).lengthsq(cell) < r2merg ) {
+	  clipper::ftype s1 = fragments[f1].score / (fragments[f1].score+1.0);
+	  clipper::ftype s2 =                 1.0 / (fragments[f1].score+1.0);
+	  for ( int r = 0; r < 3; r++ )
+	    for ( int a = 0; a < 3; a++ ) {
+	      cy1 = fragments[f2].res[r][a].coord_frac(cell);
+	      cy1 = cy1.symmetry_copy_near( spgr, cell, cx1 );
+	      fragments[f1].res[r][a] =
+		s1 * fragments[f1].res[r][a] + s2 * ( cy1.coord_orth(cell) );
+	    }
+	  fragments[f1].score += fragments[f2].score;
+	  fragments[f2].score = 0.0;
+	  fragments[f2].flag = 0;
+	}
       }
     }
   }
 
   // make a list of joins
   std::vector<std::vector<int> > joins( fragments.size() );
-  for ( int f1 = 0; f1 < fragments.size(); f1++ ) {
-    clipper::Coord_frac cx0 = fragments[f1].res[0][1].coord_frac(cell);
-    clipper::Coord_frac cx1 = fragments[f1].res[1][1].coord_frac(cell);
-    clipper::Coord_frac cx2 = fragments[f1].res[2][1].coord_frac(cell);
-    if ( fragments[f1].flag > 0 )
-      for ( int f2 = 0; f2 < fragments.size(); f2++ ) {
-	clipper::Coord_frac cy0 = fragments[f2].res[0][1].coord_frac(cell);
-	clipper::Coord_frac cy1 = fragments[f2].res[1][1].coord_frac(cell);
-	clipper::Coord_frac cy2 = fragments[f2].res[2][1].coord_frac(cell);
-	if ( fragments[f2].flag > 0 ) {
-	  cy0 = cy0.symmetry_copy_near( spgr, cell, cx1 );
-	  cy1 = cy1.symmetry_copy_near( spgr, cell, cx1 );
-	  cy2 = cy2.symmetry_copy_near( spgr, cell, cx1 );
-	  if ( f1 != f2 )
+  for ( int f1 = 0; f1 < fragments.size(); f1++ )
+    if ( fragments[f1].flag != 0 ) {
+      clipper::Coord_frac cx0 = fragments[f1].res[0][1].coord_frac(cell);
+      clipper::Coord_frac cx1 = fragments[f1].res[1][1].coord_frac(cell);
+      clipper::Coord_frac cx2 = fragments[f1].res[2][1].coord_frac(cell);
+      for ( int f2 = 0; f2 < fragments.size(); f2++ )
+	if ( fragments[f2].flag != 0 ) {
+	  if ( f1 != f2 ) {
+	    clipper::Coord_frac cy0 = fragments[f2].res[0][1].coord_frac(cell);
+	    clipper::Coord_frac cy1 = fragments[f2].res[1][1].coord_frac(cell);
+	    clipper::Coord_frac cy2 = fragments[f2].res[2][1].coord_frac(cell);
+	    cy0 = cy0.symmetry_copy_near( spgr, cell, cx1 );
+	    cy1 = cy1.symmetry_copy_near( spgr, cell, cx1 );
+	    cy2 = cy2.symmetry_copy_near( spgr, cell, cx1 );
 	    if ( (cx1-cy0).lengthsq(cell) < r2join &&
 		 (cx2-cy1).lengthsq(cell) < r2join ) {
-	      joins[f1].push_back( f2 ); 
+	      if ( fragments[f1].flag == 1 && fragments[f2].flag == 1 )
+		joins[f1].push_back( f2 );
+	      else
+		if ( f2 == f1+1 )
+		  joins[f1].push_back( f2 );
 	    }
+	  }
 	}
-      }
+    }
+
+  /*
+  for ( int j1 = 0; j1 < joins.size(); j1++ ) {
+    std::cout << j1 << "(" << fragments[j1].flag << "):\t";
+    for ( int j2 = 0; j2 < joins[j1].size(); j2++ ) {
+      std::cout << joins[j1][j2] << "(" << fragments[joins[j1][j2]].flag << ")\t";
+    }
+    std::cout << std::endl;
   }
+  */
 
   // use threading to extract successive longest chains
   std::vector<std::vector<int> > chns;
@@ -225,6 +254,16 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
       chn = longest_chain( joins );
     }
   }
+
+  /*
+  for ( int c = 0; c < chns.size(); c++ ) {
+    std::cout << c << ":\t";
+    for ( int r = 0; r < chns[c].size(); r++ ) {
+      std::cout << chns[c][r] << " ";
+    }
+    std::cout << std::endl;
+  }
+  */
 
   // now join the fragments
   char atomid[3][5] = { " N  ", " CA ", " C  " };

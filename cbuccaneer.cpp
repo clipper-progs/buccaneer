@@ -25,9 +25,9 @@ const Rama_flt rama_flt_nonhelix = { -1.5, -1.0, -1.5 };
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "0.7.1", "$Date: 2006/12/14" );
+  CCP4Program prog( "cbuccaneer", "0.7.5", "$Date: 2007/09/07" );
 
-  std::cout << "\nCopyright 2002-2006 Kevin Cowtan and University of York. All rights reserved.\n\n";
+  std::cout << "\nCopyright 2002-2007 Kevin Cowtan and University of York. All rights reserved.\n\n";
   std::cout << "Please reference:\n Cowtan K. (2006) Acta Cryst. D62, 1002-1011.\n\n";
 
   // defaults
@@ -64,6 +64,7 @@ int main( int argc, char** argv )
   double side_tgt_rad = 5.5;
   double seq_rel = 0.5;
   double moffset = 0.0;
+  bool correl = false;
   Rama_flt rama_flt = rama_flt_all;
   int verbose = 0;
 
@@ -144,6 +145,8 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) newrestype = args[arg];
     } else if ( args[arg] == "-offset" ) {
       if ( ++arg < args.size() ) moffset = clipper::String(args[arg]).f();
+    } else if ( args[arg] == "-correlation-mode" ) {
+      correl = true;
     } else if ( args[arg] == "-verbose" ) {
       if ( ++arg < args.size() ) verbose = clipper::String(args[arg]).i();
     } else {
@@ -152,14 +155,14 @@ int main( int argc, char** argv )
     }
   }
   if ( args.size() <= 1 ) {
-    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\t\tCOMPULSORY\n\t-pdbin-ref <filename>\t\tCOMPULSORY\n\t-mtzin-wrk <filename>\t\tCOMPULSORY\n\t-pdbin-wrk <filename>\n\t-seqin-wrk <filename>\n\t-pdbout-wrk <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-wrk-fo <colpath>\t\tCOMPULSORY\n\t-colin-wrk-hl <colpath>\t\tCOMPULSORY\n\t-colin-wrk-fc <colpath>\n\t-colin-wrk-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-prune\n\t-rebuild\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work strructure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 6 main steps:\n finding, growing, joining, sequencing, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input chains are grown.\n";
+    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\t\tCOMPULSORY\n\t-pdbin-ref <filename>\t\tCOMPULSORY\n\t-mtzin-wrk <filename>\t\tCOMPULSORY\n\t-pdbin-wrk <filename>\n\t-seqin-wrk <filename>\n\t-pdbout-wrk <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-wrk-fo <colpath>\t\tCOMPULSORY\n\t-colin-wrk-hl <colpath>\t\tCOMPULSORY\n\t-colin-wrk-fc <colpath>\n\t-colin-wrk-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-prune\n\t-rebuild\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 6 main steps:\n finding, growing, joining, sequencing, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input chains are grown.\n";
     exit(1);
   }
 
   // other initialisations
   clipper::Resolution resol;
   clipper::CCP4MTZfile mtzfile;
- 
+
   // Get resolution for calculation
   mtzfile.open_read( ipmtz_ref );
   double res_ref = clipper::Util::max( mtzfile.resolution().limit(), res_in );
@@ -203,15 +206,19 @@ int main( int argc, char** argv )
   // Get reference model
   clipper::MiniMol mol_ref;
   clipper::MMDBfile mmdb_ref;
+  mmdb_ref.SetFlag( MMDBF_IgnoreBlankLines | MMDBF_IgnoreNonCoorPDBErrors );
   mmdb_ref.read_file( ippdb_ref );
   mmdb_ref.import_minimol( mol_ref );
 
   // Get work model (optional)
-  clipper::MiniMol mol_wrk( hkls_wrk.spacegroup(), hkls_wrk.cell() );
+  clipper::MiniMol mol_wrk, mol_tmp;
+  mol_wrk.init( hkls_wrk.spacegroup(), hkls_wrk.cell() );
   if ( ippdb_wrk != "NONE" ) {
     clipper::MMDBfile mmdb_wrk;
+    mmdb_wrk.SetFlag( MMDBF_IgnoreBlankLines | MMDBF_IgnoreNonCoorPDBErrors );
     mmdb_wrk.read_file( ippdb_wrk );
-    mmdb_wrk.import_minimol( mol_wrk );
+    mmdb_wrk.import_minimol( mol_tmp );
+    mol_wrk.copy( mol_tmp, clipper::MM::COPY_MPC );
   }
 
   // Get work sequence (optional)
@@ -235,10 +242,13 @@ int main( int argc, char** argv )
   mapsim( sim_f, sim_hl, ref_f, ref_hl, wrk_f1, wrk_hl );
 
   // make llk target objects
+  LLK_map_target::TYPE tgttyp =
+    correl ? LLK_map_target::CORREL : LLK_map_target::NORMAL;
   LLK_map_target llktgt;
   std::vector<LLK_map_target> llkcls( 20 );
-  llktgt.init( main_tgt_rad, 0.5 );
-  if (seqnc) for ( int t = 0; t < 20; t++ ) llkcls[t].init( side_tgt_rad, 0.5 );
+  llktgt.init( main_tgt_rad, 0.5, tgttyp );
+  if (seqnc) for ( int t = 0; t < 20; t++ )
+    llkcls[t].init( side_tgt_rad, 0.5, tgttyp );
 
   // STAGE 1: Calculate target from reference data
 
@@ -324,8 +334,6 @@ int main( int argc, char** argv )
     double vol = xwrk.cell().volume() / double(xwrk.spacegroup().num_symops());
     int nres   = int( vol / 320.0 );  // 320A^3/residue on average (inc solvent)
     nfrag = clipper::Util::min( nfrag, (nfragr*nres)/100 );
-    clipper::MiniMol mol_all( hkls_wrk.spacegroup(), hkls_wrk.cell() );
-    clipper::MiniMol mol_tgt, mol_tmp;
 
     // offset the map density
     clipper::Map_stats stats( xwrk );
@@ -342,7 +350,7 @@ int main( int argc, char** argv )
 
     // model building loop
     for ( int c = 0; c < ncyc; c++ ) {
-      std::cout << "Cycle: " << c+1 << std::endl;
+      std::cout << std::endl << "Cycle: " << c+1 << std::endl;
       Ca_sequence::History seq_history;
 
       // find C-alphas
@@ -433,6 +441,10 @@ int main( int argc, char** argv )
 	     mol_wrk[c][r].type() == "+++" || mol_wrk[c][r].type() == "---" )
 	  mol_wrk[c][r].set_type( newresname );
 
+    // adjust residue numbers
+    for ( int c = 0; c < mol_wrk.size(); c++ )
+      if ( c < 26 ) ProteinTools::chain_renumber( mol_wrk[c], seq_wrk );
+
     // write answers
     clipper::MMDBfile mmdb;
     mmdb.export_minimol( mol_wrk );
@@ -440,4 +452,3 @@ int main( int argc, char** argv )
 
   }
 }
-

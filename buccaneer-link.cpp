@@ -36,7 +36,7 @@ bool Ca_link::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1,
     std::vector<std::pair<double, std::pair<int,int> > > links;
     for ( int chnn = 0; chnn < mol2.size(); chnn++ )
       for ( int chnc = 0; chnc < mol2.size(); chnc++ ) 
-	if ( chnn != chnc ) {
+	if ( chnn != chnc && mol2[chnn].size() > 3 && mol2[chnc].size() > 3 ) {
 	  int m = mol2[chnc].size()-1;
 	  int in = mol2[chnn][0].lookup( " CA ", clipper::MM::ANY );
 	  int ic = mol2[chnc][m].lookup( " CA ", clipper::MM::ANY );
