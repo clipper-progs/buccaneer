@@ -110,6 +110,7 @@ STRIP = @STRIP@
 VERSION = @VERSION@
 am__include = @am__include@
 am__quote = @am__quote@
+cbuccaneer_LDFLAGS = @cbuccaneer_LDFLAGS@
 install_sh = @install_sh@
 bin_PROGRAMS = cbuccaneer csequins
 
@@ -162,7 +163,6 @@ cbuccaneer_DEPENDENCIES = ../../clipper/contrib/libclipper-contrib.la \
 	../../clipper/phs/libclipper-phs.la \
 	../../clipper/core/libclipper-core.la \
 	../../clipper/minimol/libclipper-minimol.la
-cbuccaneer_LDFLAGS =
 am_csequins_OBJECTS = csequins.$(OBJEXT) buccaneer-sequence.$(OBJEXT) \
 	simulate-lib.$(OBJEXT) buccaneer-prot.$(OBJEXT) \
 	buccaneer-lib.$(OBJEXT)
