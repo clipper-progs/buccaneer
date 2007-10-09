@@ -5,12 +5,12 @@ buccaneer-build.cpp     buccaneer-join.cpp      buccaneer-sequence.cpp \
 buccaneer-correct.cpp   buccaneer-lib.cpp       cbuccaneer.cpp \
 buccaneer-filter.cpp    buccaneer-link.cpp      simplex-lib.cpp \
 buccaneer-find.cpp      buccaneer-prot.cpp      simulate-lib.cpp \
-buccaneer-grow.cpp      buccaneer-prune.cpp \
+buccaneer-grow.cpp      buccaneer-prune.cpp 	buccaneer-ncsbuild.cpp \
 buccaneer-build.h       buccaneer-join.h        buccaneer-sequence.h \
 buccaneer-correct.h     buccaneer-lib.h         simplex-lib.h \
 buccaneer-filter.h      buccaneer-link.h        simulate-lib.h \
 buccaneer-find.h        buccaneer-prot.h \
-buccaneer-grow.h        buccaneer-prune.h
+buccaneer-grow.h        buccaneer-prune.h	buccaneer-ncsbuild.h
 
 csequins_SOURCES = \
 csequins.cpp buccaneer-sequence.cpp simulate-lib.cpp buccaneer-prot.cpp \

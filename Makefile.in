@@ -119,12 +119,12 @@ buccaneer-build.cpp     buccaneer-join.cpp      buccaneer-sequence.cpp \
 buccaneer-correct.cpp   buccaneer-lib.cpp       cbuccaneer.cpp \
 buccaneer-filter.cpp    buccaneer-link.cpp      simplex-lib.cpp \
 buccaneer-find.cpp      buccaneer-prot.cpp      simulate-lib.cpp \
-buccaneer-grow.cpp      buccaneer-prune.cpp \
+buccaneer-grow.cpp      buccaneer-prune.cpp 	buccaneer-ncsbuild.cpp \
 buccaneer-build.h       buccaneer-join.h        buccaneer-sequence.h \
 buccaneer-correct.h     buccaneer-lib.h         simplex-lib.h \
 buccaneer-filter.h      buccaneer-link.h        simulate-lib.h \
 buccaneer-find.h        buccaneer-prot.h \
-buccaneer-grow.h        buccaneer-prune.h
+buccaneer-grow.h        buccaneer-prune.h	buccaneer-ncsbuild.h
 
 
 csequins_SOURCES = \
@@ -153,7 +153,7 @@ am_cbuccaneer_OBJECTS = buccaneer-build.$(OBJEXT) \
 	buccaneer-link.$(OBJEXT) simplex-lib.$(OBJEXT) \
 	buccaneer-find.$(OBJEXT) buccaneer-prot.$(OBJEXT) \
 	simulate-lib.$(OBJEXT) buccaneer-grow.$(OBJEXT) \
-	buccaneer-prune.$(OBJEXT)
+	buccaneer-prune.$(OBJEXT) buccaneer-ncsbuild.$(OBJEXT)
 cbuccaneer_OBJECTS = $(am_cbuccaneer_OBJECTS)
 cbuccaneer_LDADD = $(LDADD)
 cbuccaneer_DEPENDENCIES = ../../clipper/contrib/libclipper-contrib.la \
@@ -191,6 +191,7 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-join.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-lib.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-link.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/buccaneer-ncsbuild.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prot.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prune.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-sequence.Po \
@@ -277,6 +278,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-join.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-lib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-link.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-ncsbuild.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prot.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prune.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-sequence.Po@am__quote@
