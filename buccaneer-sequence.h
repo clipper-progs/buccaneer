@@ -12,15 +12,6 @@ class Ca_sequence {
   bool operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq );
   int num_sequenced() const;
   clipper::String format() const;
-
-  class History {
-  public:
-    void append( const Ca_sequence& data );
-    clipper::String format( const clipper::MiniMol& mol ) const;
-  private:
-    std::vector<std::pair<int,Score_list<clipper::String> > > history;
-  };
-
   static double phi_approx( double z );
   static double sequence_overlap( const clipper::String& seq1, const clipper::String& seq2 );
   static double sequence_similarity( const clipper::String& seq1, const clipper::String& seq2 );
@@ -34,6 +25,5 @@ class Ca_sequence {
  private:
   double reliability_;
   int num_seq;
-  std::vector<std::pair<int,Score_list<clipper::String> > > history;
-  static int tag;
+  std::vector<Score_list<clipper::String> > history;
 };

@@ -5,11 +5,6 @@
 
 #include <clipper/clipper-contrib.h>
 
-#include <set>
-
-// tag counter
-int Ca_sequence::tag = 0;
-
 
 // cumulative normal distribution function
 //double phi(double z)
@@ -461,8 +456,6 @@ bool Ca_sequence::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& m
   ProteinTools::chain_tidy( mol2, mol1 );
 
   // set relibility criteria and docking count
-  double score_cutoff = -20.0 * reliability_;  // min score
-  double screl_cutoff =   0.3 * reliability_;  // min diff between 1st & 2nd
   num_seq = 0;
 
   // now loop over chains
@@ -484,23 +477,12 @@ bool Ca_sequence::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& m
     // apply sequence
     if ( apply ) sequence_apply( mol2[chn], matches[0] );
 
-    // flag tag for whether chain sequenced
-    int tagx = tag;
-    if ( !apply ) tagx += 10000;
-
-    // tag the chains for later reference
-    for ( int res = 0; res < mol2[chn].size(); res++ )
-      mol2[chn][res].set_property( "TAG", clipper::Property<int>( tagx ) );
-
     // count sequenced residues
     for ( int res = 0; res < mol2[chn].size(); res++ )
       if ( mol2[chn][res].type() != "UNK" ) num_seq++;
 
     // save some info for future output
-    std::pair<int,Score_list<clipper::String> > histdat( tagx, matches );
-    history.push_back( histdat );
-
-    tag++;
+    history.push_back( matches );
   }
 
   return true;
@@ -517,55 +499,12 @@ clipper::String Ca_sequence::format() const
 {
   clipper::String result = "";
   for ( int chn = 0; chn < history.size(); chn++ ) {
-    result += "Chain number: " + clipper::String( chn, 4 ) + "    length: " + clipper::String( int(history[chn].second[0].length()) ) + "\n";
-    for ( int res = 0; res < history[chn].second.size(); res++ ) {
-      result += history[chn].second[res] + " \t" +
-	clipper::String( history[chn].second.score(res), 10, 6 ) + "\n";
-    }
-  }
-  return result;
-}
-
-
-// history class - for output
-
-void Ca_sequence::History::append( const Ca_sequence& data )
-{
-  for ( int i = 0; i < data.history.size(); i++ )
-    history.push_back( data.history[i] );
-}
-
-
-clipper::String Ca_sequence::History::format( const clipper::MiniMol& mol ) const
-{
-  clipper::String result = "";
-  for ( int h = 0; h < history.size(); h++ ) {
-    int tag = history[h].first;
-    std::set<clipper::String> ids;
-    clipper::String chn = "";
-    // search for ids in the final model with this tag
-    for ( int c = 0; c < mol.size(); c++ )
-      for ( int r = 0; r < mol[c].size(); r++ ) {
-	if ( mol[c][r].exists_property("TAG") ) {
-	  // MS compiler bug workaround: should be dynamic_cast
-	  int t = static_cast<const clipper::Property<int>&>(mol[c][r].get_property("TAG")).value();
-	  if ( t == tag ) ids.insert( mol[c].id() );
-	}
-      }
-    if ( ids.size() > 0 ) {
-      // get chain letters
-      for ( std::set<clipper::String>::iterator i = ids.begin(); i != ids.end();
-	    i++ ) chn += (*i) + " ";
-      // now print chain infomation
-      result += "Sequencing fragment of length: " + clipper::String( int(history[h].second[0].length()) ) + "  Final chain ID(s): " + chn + "\n";
-      for ( int s = 0; s < clipper::Util::min(history[h].second.size(),5);
-	    s++ ) {
-	if ( s == 0 )
-	  if ( tag < 10000 ) result += " Accepted: ";
-	  else               result += " Rejected: ";
-	else result += "           ";
-	result += history[h].second[s] + " \t" +
-	  clipper::String( history[h].second.score(s), 10, 6 ) + "\n";
+    int nhist = clipper::Util::min( history[chn].size(), 5 );
+    if ( nhist > 0 ) {
+      result += "Chain number: " + clipper::String( chn, 4 ) + "    length: " + clipper::String( int(history[chn][0].length()) ) + "\n";
+      for ( int res = 0; res < nhist; res++ ) {
+	result += history[chn][res] + " \t" +
+	  clipper::String( history[chn].score(res), 10, 6 ) + "\n";
       }
     }
   }

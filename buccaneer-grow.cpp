@@ -85,7 +85,7 @@ bool Ca_grow::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1,
       residue.set_type("UNK");
       clipper::MAtom atom = clipper::Atom::null();
       atom.set_occupancy(1.0);
-      atom.set_u_iso( 1.0 );
+      atom.set_u_iso( 0.5 );
 
       atom.set_element( "N" );
       atom.set_id( "N" );
@@ -150,7 +150,7 @@ Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   //return ca0.next_ca_group( scores_l2[0].r1.psi, scores_l2[0].r1.phi );
   // now calculate full likelihood scores and pick best
   double ll_best = 1.0e6;
-  Rama_ang2 ra_best;
+  Rama_ang2 ra_best = scores_l2[0];
   for ( int l2 = 0; l2 < scores_l2.size(); l2++ ) {
     ca1 = ca0.next_ca_group( scores_l2[l2].r1.psi, scores_l2[l2].r1.phi );
     ca2 = ca1.next_ca_group( scores_l2[l2].r2.psi, scores_l2[l2].r2.phi );
@@ -215,7 +215,7 @@ Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   //return ca0.prev_ca_group( scores_l2[0].r1.phi, scores_l2[0].r1.psi );
   // now calculate full likelihood scores and pick best
   double ll_best = 1.0e6;
-  Rama_ang2 ra_best;
+  Rama_ang2 ra_best = scores_l2[0];
   for ( int l2 = 0; l2 < scores_l2.size(); l2++ ) {
     ca1 = ca0.prev_ca_group( scores_l2[l2].r1.phi, scores_l2[l2].r1.psi );
     ca2 = ca1.prev_ca_group( scores_l2[l2].r2.phi, scores_l2[l2].r2.psi );

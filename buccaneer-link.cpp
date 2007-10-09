@@ -99,7 +99,9 @@ bool Ca_link::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1,
       if ( scrbest < cutoff ) {
 	clipper::MPolymer mp;
 	clipper::MAtom ca( clipper::MAtom::null() ), cn, cc;
-	ca.set_occupancy(1.0); ca.set_u_iso(1.0); cn = cc = ca;
+	ca.set_occupancy( 1.0 );
+	ca.set_u_iso( 0.5 );
+	cn = cc = ca;
 	cn.set_element( "N" ); cn.set_id( "N"  );
 	ca.set_element( "C" ); ca.set_id( "CA" );
 	cc.set_element( "C" ); cc.set_id( "C"  );

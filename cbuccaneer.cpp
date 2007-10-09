@@ -10,8 +10,9 @@
 #include "buccaneer-link.h"
 #include "buccaneer-sequence.h"
 #include "buccaneer-correct.h"
-#include "buccaneer-prune.h"
 #include "buccaneer-filter.h"
+#include "buccaneer-ncsbuild.h"
+#include "buccaneer-prune.h"
 #include "buccaneer-build.h"
 
 
@@ -25,10 +26,13 @@ const Rama_flt rama_flt_nonhelix = { -1.5, -1.0, -1.5 };
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "0.7.5", "$Date: 2007/09/07" );
+  CCP4Program prog( "cbuccaneer", "1.0.0", "$Date: 2007/10/04" );
+  prog.set_termination_message( "Failed" );
 
-  std::cout << "\nCopyright 2002-2007 Kevin Cowtan and University of York. All rights reserved.\n\n";
-  std::cout << "Please reference:\n Cowtan K. (2006) Acta Cryst. D62, 1002-1011.\n\n";
+  std::cout << std::endl << "Copyright 2002-2007 Kevin Cowtan and University of York." << std::endl << std::endl;
+  prog.summary_beg();
+  std::cout << "$TEXT:Reference: $$ Please reference $$" << std::endl << std::endl << " 'The Buccaneer software for automated model building'" << std::endl << " Cowtan K. (2006) Acta Cryst. D62, 1002-1011." << std::endl << std::endl << "$$";
+  prog.summary_end();
 
   // defaults
   clipper::String title;
@@ -41,6 +45,7 @@ int main( int argc, char** argv )
   clipper::String ipcol_ref_hl = "/*/*/FC";
   clipper::String ipcol_wrk_fo = "NONE";
   clipper::String ipcol_wrk_hl = "NONE";
+  clipper::String ipcol_wrk_pw = "NONE";
   clipper::String ipcol_wrk_fc = "NONE";
   clipper::String ipcol_wrk_fr = "NONE";
   clipper::String oppdb = "buccaneer.pdb";
@@ -57,8 +62,9 @@ int main( int argc, char** argv )
   bool link  = false;
   bool seqnc = false;
   bool corct = false;
-  bool prune = false;
   bool filtr = false;
+  bool ncsbd = false;
+  bool prune = false;
   bool build = false;
   double main_tgt_rad = 4.0;
   double side_tgt_rad = 5.5;
@@ -96,6 +102,8 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) ipcol_wrk_fo = args[arg];
     } else if ( args[arg] == "-colin-wrk-hl" ) {
       if ( ++arg < args.size() ) ipcol_wrk_hl = args[arg];
+    } else if ( args[arg] == "-colin-wrk-phifom" ) {
+      if ( ++arg < args.size() ) ipcol_wrk_pw = args[arg];
     } else if ( args[arg] == "-colin-wrk-fc" ) {
       if ( ++arg < args.size() ) ipcol_wrk_fc = args[arg];
     } else if ( args[arg] == "-colin-wrk-free" ) {
@@ -118,6 +126,8 @@ int main( int argc, char** argv )
       corct = true;
     } else if ( args[arg] == "-filter" ) {
       filtr = true;
+    } else if ( args[arg] == "-ncsbuild" ) {
+      ncsbd = true;
     } else if ( args[arg] == "-prune" ) {
       prune = true;
     } else if ( args[arg] == "-rebuild" ) {
@@ -155,13 +165,15 @@ int main( int argc, char** argv )
     }
   }
   if ( args.size() <= 1 ) {
-    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\t\tCOMPULSORY\n\t-pdbin-ref <filename>\t\tCOMPULSORY\n\t-mtzin-wrk <filename>\t\tCOMPULSORY\n\t-pdbin-wrk <filename>\n\t-seqin-wrk <filename>\n\t-pdbout-wrk <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-wrk-fo <colpath>\t\tCOMPULSORY\n\t-colin-wrk-hl <colpath>\t\tCOMPULSORY\n\t-colin-wrk-fc <colpath>\n\t-colin-wrk-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-prune\n\t-rebuild\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 6 main steps:\n finding, growing, joining, sequencing, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input chains are grown.\n";
+    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\t\tCOMPULSORY\n\t-pdbin-ref <filename>\t\tCOMPULSORY\n\t-mtzin-wrk <filename>\t\tCOMPULSORY\n\t-pdbin-wrk <filename>\n\t-seqin-wrk <filename>\n\t-pdbout-wrk <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-wrk-fo <colpath>\t\tCOMPULSORY\n\t-colin-wrk-hl <colpath> or -colin-wrk-phifom <colpath>\tCOMPULSORY\n\t-colin-wrk-fc <colpath>\n\t-colin-wrk-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 6 main steps:\n finding, growing, joining, sequencing, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input chains are grown.\n";
     exit(1);
   }
 
   // other initialisations
+  using clipper::data32::Compute_fphi_from_fsigf_phifom;
   clipper::Resolution resol;
   clipper::CCP4MTZfile mtzfile;
+  std::string msg;
 
   // Get resolution for calculation
   mtzfile.open_read( ipmtz_ref );
@@ -184,24 +196,30 @@ int main( int argc, char** argv )
   mtzfile.close_read();
 
   // Get work reflection data
+  clipper::MTZcrystal cxtl;
   clipper::HKL_info hkls_wrk;
   mtzfile.open_read( ipmtz_wrk );
   hkls_wrk.init( mtzfile.spacegroup(), mtzfile.cell(), resol, true );
-  clipper::HKL_data<clipper::data32::F_sigF> wrk_f ( hkls_wrk );
-  clipper::HKL_data<clipper::data32::ABCD>   wrk_hl( hkls_wrk );
-  clipper::HKL_data<clipper::data32::F_phi>  fphi( hkls_wrk );
-  clipper::HKL_data<clipper::data32::Flag>   flag( hkls_wrk );
+  mtzfile.import_crystal( cxtl, ipcol_wrk_fo );
+  clipper::HKL_data<clipper::data32::F_sigF>  wrk_f ( hkls_wrk, cxtl );
+  clipper::HKL_data<clipper::data32::ABCD>    wrk_hl( hkls_wrk, cxtl );
+  clipper::HKL_data<clipper::data32::Phi_fom> wrk_pw( hkls_wrk, cxtl );
+  clipper::HKL_data<clipper::data32::F_phi>   fphi( hkls_wrk, cxtl );
+  clipper::HKL_data<clipper::data32::Flag>    flag( hkls_wrk, cxtl );
   mtzfile.import_hkl_data( wrk_f , ipcol_wrk_fo );
-  mtzfile.import_hkl_data( wrk_hl, ipcol_wrk_hl );
-  if ( ipcol_wrk_fc != "NONE" ) mtzfile.import_hkl_data( fphi, ipcol_wrk_fc );
-  if ( ipcol_wrk_fr != "NONE" ) mtzfile.import_hkl_data( flag, ipcol_wrk_fr );
+  if ( ipcol_wrk_hl != "NONE" ) mtzfile.import_hkl_data( wrk_hl,ipcol_wrk_hl );
+  if ( ipcol_wrk_pw != "NONE" ) mtzfile.import_hkl_data( wrk_pw,  ipcol_wrk_pw );
+  if ( ipcol_wrk_fc != "NONE" ) mtzfile.import_hkl_data( fphi,  ipcol_wrk_fc );
+  if ( ipcol_wrk_fr != "NONE" ) mtzfile.import_hkl_data( flag,  ipcol_wrk_fr );
   mtzfile.close_read();
 
   // apply free flag
   clipper::HKL_data<clipper::data32::F_sigF> wrk_f1 = wrk_f;
   //wrk_f1.mask( flag != 0 );
   for ( clipper::HKL_data_base::HKL_reference_index ih = hkls_wrk.first(); !ih.last(); ih.next() ) if ( flag[ih].flag() == 0 ) wrk_f1[ih] = clipper::data32::F_sigF();  //ugly hack for broken SGI compilers
-
+  // and fill in hl
+  if ( ipcol_wrk_hl == "NONE" )
+    wrk_hl.compute( wrk_pw, clipper::data32::Compute_abcd_from_phifom() );
 
   // Get reference model
   clipper::MiniMol mol_ref;
@@ -212,7 +230,7 @@ int main( int argc, char** argv )
 
   // Get work model (optional)
   clipper::MiniMol mol_wrk, mol_tmp;
-  mol_wrk.init( hkls_wrk.spacegroup(), hkls_wrk.cell() );
+  mol_wrk.init( hkls_wrk.spacegroup(), cxtl );
   if ( ippdb_wrk != "NONE" ) {
     clipper::MMDBfile mmdb_wrk;
     mmdb_wrk.SetFlag( MMDBF_IgnoreBlankLines | MMDBF_IgnoreNonCoorPDBErrors );
@@ -253,11 +271,12 @@ int main( int argc, char** argv )
   // STAGE 1: Calculate target from reference data
 
   {
+
     // reference map
     clipper::HKL_data<clipper::data32::F_phi> fphi( hkls_ref );
     clipper::HKL_data<clipper::data32::Phi_fom> phiw( hkls_ref );
     phiw.compute( sim_hl, clipper::data32::Compute_phifom_from_abcd() );
-    fphi.compute( sim_f, phiw, clipper::data32::Compute_fphi_from_fsigf_phifom() );
+    fphi.compute( sim_f, phiw, Compute_fphi_from_fsigf_phifom() );
     clipper::Grid_sampling grid( hkls_ref.spacegroup(), hkls_ref.cell(), hkls_ref.resolution() );
     clipper::Xmap<float> xref( hkls_ref.spacegroup(), hkls_ref.cell(), grid );
     xref.fft_from( fphi );
@@ -313,13 +332,12 @@ int main( int argc, char** argv )
 
   {
     // work map
-    if ( ipcol_wrk_fc == "NONE" ) {
-      clipper::HKL_data<clipper::data32::Phi_fom> phiw( hkls_wrk );
-      phiw.compute( wrk_hl, clipper::data32::Compute_phifom_from_abcd() );
-      fphi.compute( wrk_f1, phiw, clipper::data32::Compute_fphi_from_fsigf_phifom() );
-    }
-    clipper::Grid_sampling grid( hkls_wrk.spacegroup(), hkls_wrk.cell(), hkls_wrk.resolution() );
-    clipper::Xmap<float> xwrk( hkls_wrk.spacegroup(), hkls_wrk.cell(), grid );
+    wrk_pw.compute( wrk_hl, clipper::data32::Compute_phifom_from_abcd() );
+    if ( ipcol_wrk_fc == "NONE" )
+      fphi.compute( wrk_f1, wrk_pw, Compute_fphi_from_fsigf_phifom() );
+    clipper::Spacegroup cspg = hkls_wrk.spacegroup();
+    clipper::Grid_sampling grid( cspg, cxtl, hkls_wrk.resolution() );
+    clipper::Xmap<float>   xwrk( cspg, cxtl, grid );
     xwrk.fft_from( fphi );
 
     // optionlly write work map
@@ -349,15 +367,15 @@ int main( int argc, char** argv )
     Ca_find cafind( nfrag );
 
     // model building loop
-    for ( int c = 0; c < ncyc; c++ ) {
-      std::cout << std::endl << "Cycle: " << c+1 << std::endl;
-      Ca_sequence::History seq_history;
+    for ( int cyc = 0; cyc < ncyc; cyc++ ) {
+      std::cout << std::endl << "Cycle: " << cyc+1 << std::endl << std::endl;
+      clipper::String history = "";
 
       // find C-alphas
       if ( find ) {
 	cafind( mol_tmp, mol_wrk, xwrk, llktgt );
 	mol_wrk = mol_tmp;
-	std::cout << "\nC-alphas after finding:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+	std::cout << " C-alphas after finding:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
       }
 
       // grow C-alphas
@@ -365,7 +383,7 @@ int main( int argc, char** argv )
 	Ca_grow cagrow( 25 );
 	cagrow( mol_tmp, mol_wrk, xwrk, llktgt );
 	mol_wrk = mol_tmp;
-	std::cout << "\nC-alphas after growing:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+	std::cout << " C-alphas after growing:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
       }
     
       // join C-alphas
@@ -373,7 +391,7 @@ int main( int argc, char** argv )
 	Ca_join cajoin( 2.0 );
 	cajoin( mol_tmp, mol_wrk );
 	mol_wrk = mol_tmp;
-	std::cout << "\nC-alphas after joining:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+	std::cout << " C-alphas after joining:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
       }
 
       // link C-alphas
@@ -381,7 +399,7 @@ int main( int argc, char** argv )
 	Ca_link calnk( 10.0, 24 );
 	calnk( mol_tmp, mol_wrk, xwrk, llktgt );
 	mol_wrk = mol_tmp;
-	std::cout << "\nC-alphas linked:           " << calnk.num_linked() << std::endl;
+	std::cout << " C-alphas linked:           " << calnk.num_linked() << std::endl;
       }
     
       // assign sequences
@@ -389,8 +407,8 @@ int main( int argc, char** argv )
 	Ca_sequence caseq( seq_rel );
 	caseq( mol_tmp, mol_wrk, xwrk, llkcls, seq_wrk );
 	mol_wrk = mol_tmp;
-	std::cout << "\nC-alphas sequenced:        " << caseq.num_sequenced() << std::endl;
-	seq_history.append( caseq );
+	std::cout << " C-alphas sequenced:        " << caseq.num_sequenced() << std::endl;
+	history += caseq.format();
       }
 
       // correct insertions/deletions
@@ -398,7 +416,7 @@ int main( int argc, char** argv )
 	Ca_correct cacor( 12 );
 	cacor( mol_tmp, mol_wrk, xwrk, llkcls, seq_wrk );
 	mol_wrk = mol_tmp;
-	std::cout << "\nC-alphas corrected:        " << cacor.num_corrected() << std::endl;
+	std::cout << " C-alphas corrected:        " << cacor.num_corrected() << std::endl;
       }
 
       // filter poor density
@@ -406,7 +424,15 @@ int main( int argc, char** argv )
 	Ca_filter cafiltr( 1.0 );
 	cafiltr( mol_tmp, mol_wrk, xwrk );
 	mol_wrk = mol_tmp;
-	std::cout << "\nC-alphas after filtering:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+	std::cout << " C-alphas after filtering:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+      }
+
+      // ncsbuild C-alphas
+      if ( ncsbd ) {
+	Ca_ncsbuild cancsbuild( seq_rel, 1.0, 12 );
+	cancsbuild( mol_tmp, mol_wrk, xwrk, llkcls, seq_wrk );
+	mol_wrk = mol_tmp;
+	std::cout << " C-alphas after NCS build:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
       }
 
       // prune C-alphas
@@ -414,7 +440,7 @@ int main( int argc, char** argv )
 	Ca_prune caprune( 3.0 );
 	caprune( mol_tmp, mol_wrk );
 	mol_wrk = mol_tmp;
-	std::cout << "\nC-alphas after pruning:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+	std::cout << " C-alphas after pruning:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
       }
 
       // build side chains/atoms
@@ -422,7 +448,7 @@ int main( int argc, char** argv )
 	Ca_build cabuild( newrestype );
 	cabuild( mol_tmp, mol_wrk, xwrk );
 	mol_wrk = mol_tmp;
-	std::cout << "\nC-alphas after rebuilding: " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+	std::cout << " C-alphas after rebuilding: " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
       }
 
       // tidy output model
@@ -430,16 +456,37 @@ int main( int argc, char** argv )
       mol_wrk = mol_tmp;
     
       // user output
-      if ( verbose >= 0 ) std::cout << std::endl << seq_history.format( mol_wrk );
+      std::cout << std::endl;
+      if ( verbose >= 1 ) std::cout << history << std::endl;
+      int nres, nseq, nchn, nmax;
+      nchn = mol_wrk.size();
+      nres = nseq = nmax = 0;
+      for ( int c = 0; c < mol_wrk.size(); c++ ) {
+	if ( mol_wrk[c].size() > nmax ) nmax = mol_wrk[c].size();
+	for ( int r = 0; r < mol_wrk[c].size(); r++ ) {
+	  if ( mol_wrk[c][r].lookup( " CA ", clipper::MM::ANY ) >= 0 ) nres++;
+	  if ( ProteinTools::residue_index( mol_wrk[c][r].type() ) >= 0 ) nseq++;
+	}
+      }
+      prog.summary_beg();
+      std::cout << "Internal cycle " << clipper::String( cyc+1, 3 ) << std::endl;
+      msg = ( clipper::String( nres, 5 ) + " residues were built in " +
+	      clipper::String( nchn, 2 ) + " chains, the longest having " +
+	      clipper::String( nmax, 4 ) + " residues." + "\n" +
+	      clipper::String( nseq, 5 ) + " residues were sequenced, " +
+	      "after pruning.\n" );
+      std::cout << msg << std::endl;
+      prog.summary_end();
 
     } // next cycle
 
     // adjust residue names
-    for ( int c = 0; c < mol_wrk.size(); c++ )
-      for ( int r = 0; r < mol_wrk[c].size(); r++ )
-	if ( mol_wrk[c][r].type() == "UNK" || mol_wrk[c][r].type() == "???" ||
-	     mol_wrk[c][r].type() == "+++" || mol_wrk[c][r].type() == "---" )
-	  mol_wrk[c][r].set_type( newresname );
+    if ( newresname != "NONE" )
+      for ( int c = 0; c < mol_wrk.size(); c++ )
+	for ( int r = 0; r < mol_wrk[c].size(); r++ )
+	  if ( mol_wrk[c][r].type() == "UNK" || mol_wrk[c][r].type() == "???" ||
+	       mol_wrk[c][r].type() == "+++" || mol_wrk[c][r].type() == "---" )
+	    mol_wrk[c][r].set_type( newresname );
 
     // adjust residue numbers
     for ( int c = 0; c < mol_wrk.size(); c++ )
@@ -449,6 +496,8 @@ int main( int argc, char** argv )
     clipper::MMDBfile mmdb;
     mmdb.export_minimol( mol_wrk );
     mmdb.write_file( oppdb );
-
   }
+
+  std::cout << "$TEXT:Result: $$ $$" << std::endl << msg << "$$" << std::endl;
+  prog.set_termination_message( "Normal termination" );
 }

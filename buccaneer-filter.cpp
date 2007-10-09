@@ -22,8 +22,8 @@ std::vector<double> smooth( const std::vector<double>& x )
 
 bool Ca_filter::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1, const clipper::Xmap<float>& xmap )
 {
-  clipper::Cell       cell = mol1.cell();
-  clipper::Spacegroup spgr = mol1.spacegroup();
+  clipper::Cell       cell = xmap.cell();
+  clipper::Spacegroup spgr = xmap.spacegroup();
 
   // determine sigma cutoff based on map
   clipper::Map_stats stats( xmap );
@@ -74,13 +74,13 @@ bool Ca_filter::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol
 	res++;
       }
       int res1 = res;
-      if ( res < moltmp[chn].size() && res1 - res0 >= 3 ) {
-	int resm = res0+1;
-	for ( int r = res0+1; r < res1-1; r++ )
+      if ( res1 < moltmp[chn].size() ) {
+	int resm = res0;  // find the weakest residues to delete
+	for ( int r = res0; r < res1; r++ )
 	  if ( scores[r] < scores[resm] ) resm = r;
-        moltmp[chn][resm-1].set_type( "~~~" );
-	moltmp[chn][resm  ].set_type( "~~~" );
-	moltmp[chn][resm+1].set_type( "~~~" );
+	moltmp[chn][resm].set_type( "~~~" );
+	if ( resm-1 >= res0 ) moltmp[chn][resm-1].set_type( "~~~" );
+	if ( resm+1 <  res1 ) moltmp[chn][resm+1].set_type( "~~~" );
       }
     }
 
@@ -108,10 +108,4 @@ bool Ca_filter::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol
   }
 
   return true;
-}
-
-
-int Ca_filter::num_filtered() const
-{
-  return num_filter;
 }

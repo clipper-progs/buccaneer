@@ -144,12 +144,12 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
 	  fragment.flag = 1;
 	  fragment.score = 1.0;
 	  // upweight sequenced fragments, and flag core seqeunced regions.
-	  if ( mol2[chn][res].type() != "UNK" ) {
+	  if ( mol1[chn][res].type() != "UNK" ) {
 	    int r1, r2;
 	    for ( r1 = res-1; r1 >= 0; r1-- )
-	      if ( mol2[chn][r1].type() == "UNK" ) break;
-	    for ( r2 = res+1; r2 < mol2[chn].size(); r2++ )
-	      if ( mol2[chn][r2].type() == "UNK" ) break;
+	      if ( mol1[chn][r1].type() == "UNK" ) break;
+	    for ( r2 = res+1; r2 < mol1[chn].size(); r2++ )
+	      if ( mol1[chn][r2].type() == "UNK" ) break;
 	    int d = clipper::Util::min( res-r1, r2-res );
 	    fragment.score += 0.1 * double(d);  // upweight sequenced
 	    if ( d > 15 ) fragment.flag = 2;    // flag core sequenced
@@ -276,7 +276,7 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
     int ires = 1;
     clipper::MAtom atom = clipper::Atom::null();
     atom.set_occupancy(1.0);
-    atom.set_u_iso( 1.0 );
+    atom.set_u_iso( 0.5 );
 
     const std::vector<int>& chn = chns[c];
 

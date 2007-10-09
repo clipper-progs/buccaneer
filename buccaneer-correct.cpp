@@ -106,25 +106,26 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
     clipper::MPolymer mpwrk = mol2[chn];
     clipper::String seq0 = ProteinTools::chain_sequence( mpwrk );
 
+    const int offset  = 8;    // how far to search for insertion/deletion
+    const int buffer  = 6;    // number of residues padding at end
+    const double zoff = 0.1;  // fudge factor to favour rebuilding
+
     // deal with insertions
-    last_pos = 0;
+    last_pos = buffer;
     while ( seq0.find( "+", last_pos ) != std::string::npos ) {
-      const int offset  = 8;    // how far to search for insertion/deletion
-      const int buffer  = 6;    // number of residues padding at end
-      const double zoff = 0.1;  // fudge factor to favour rebuilding
       int ins1 = seq0.find_first_of( "+", last_pos );
       int ins2 = seq0.find_first_not_of( "+", ins1 );
       int nins = ins2 - ins1;
       int len = mpwrk.size();
-      if ( ins2 == std::string::npos ) break;
+      if ( ins2 == std::string::npos || ins2 > len-buffer ) break;
       // pick a range of positions to modify
       int r1, r2;
       int o1 = clipper::Util::max(ins1-offset,0);
-      int o2 = clipper::Util::min(ins2+offset,int(seq0.length())-1);
-      for ( r1 = ins1-1; r1 >  o1; r1-- ) if ( seq0[r1] == '?' ) break;
-      for ( r2 = ins2;   r2 <= o2; r2++ ) if ( seq0[r2] == '?' ) break;
+      int o2 = clipper::Util::min(ins2+offset,len-1);
+      for ( r1 = ins1-1; r1 >  o1; r1-- ) if ( !isupper( seq0[r1] ) ) break;
+      for ( r2 = ins2;   r2 <= o2; r2++ ) if ( !isupper( seq0[r2] ) ) break;
       r1 = clipper::Util::max( r1, buffer );
-      r2 = clipper::Util::min( r2, int(seq0.length())-buffer );
+      r2 = clipper::Util::min( r2, len-buffer );
       // OPTIMISATION: mask the sequence
       for ( int r = 0; r < mpwrk.size(); r++ )
 	if ( r < r1-2 || r > r2+2 ) mpwrk[r].set_type( mpwrk[r].type() + "*" );
@@ -161,25 +162,22 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
       for ( int r = 0; r < mpwrk.size(); r++ )
 	mpwrk[r].set_type( mpwrk[r].type().substr(0,3) );
       // and update
-      clipper::String seq0 = ProteinTools::chain_sequence( mpwrk );
+      seq0 = ProteinTools::chain_sequence( mpwrk );
       last_pos = ins2 + 1;
     }  // done insertion correction
 
     // deal with deletions
-    last_pos = 0;
+    last_pos = buffer;
     while ( seq0.find( "-", last_pos ) != std::string::npos ) {
-      const int offset  = 8;    // how far to search for insertion/deletion
-      const int buffer  = 6;    // number of residues padding at end
-      const double zoff = 0.1;  // fudge factor to favour rebuilding
       int del1 = seq0.find_first_of( "-", last_pos );
       int del2 = seq0.find_first_not_of( "-", del1 );
       int ndel = del2 - del1;
       int len = mpwrk.size();
-      if ( del2 == std::string::npos ) break;
+      if ( del2 == std::string::npos || del2 > len-buffer ) break;
       // look for the missing sequence elements in the sequence data
       int i1, i2, f1, f2, e1, e2;
-      for ( i1 = del1-1;   i1 > 0; i1-- ) if ( seq0[i1-1] == '?' ) break;
-      for ( i2 = del2; i2 < len-1; i2++ ) if ( seq0[i2+1] == '?' ) break;
+      for ( i1 = del1-1;   i1 > 0; i1-- ) if ( !isupper( seq0[i1-1] ) ) break;
+      for ( i2 = del2; i2 < len-1; i2++ ) if ( !isupper( seq0[i2+1] ) ) break;
       clipper::String s1 = seq0.substr( i1  , del1-i1 );
       clipper::String s2 = seq0.substr( del2, i2-del2 );
       clipper::String seqx;
@@ -188,7 +186,7 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
 	f2 = seq[c].sequence().find(s2);
 	e1 = f1 + s1.length(); e2 = f2 + s2.length();
 	if ( f1 != std::string::npos && f2 != std::string::npos )
-	  if ( f2 > e1 && f2 <= f1 + s1.length() + 4 ) {
+	  if ( f2 > e1 && f2 <= e1 + 4 ) {
 	    seqx = seq[c].sequence().substr( e1, f2-e1 );
 	    break;
 	  }
@@ -197,11 +195,11 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
       // pick a range of positions to modify
       int r1, r2;
       int o1 = clipper::Util::max(del1-offset,0);
-      int o2 = clipper::Util::min(del2+offset,int(seq0.length())-1);
-      for ( r1 = del1-1; r1 >  o1; r1-- ) if ( seq0[r1] == '?' ) break;
-      for ( r2 = del2;   r2 <= o2; r2++ ) if ( seq0[r2] == '?' ) break;
+      int o2 = clipper::Util::min(del2+offset,len-1);
+      for ( r1 = del1-1; r1 >  o1; r1-- ) if ( !isupper( seq0[r1] ) ) break;
+      for ( r2 = del2;   r2 <= o2; r2++ ) if ( !isupper( seq0[r2] ) ) break;
       r1 = clipper::Util::max( r1, buffer );
-      r2 = clipper::Util::min( r2, int(seq0.length())-buffer );
+      r2 = clipper::Util::min( r2, len-buffer );
       // OPTIMISATION: mask the sequence
       for ( int r = 0; r < mpwrk.size(); r++ )
 	if ( r < r1-2 || r > r2+2 ) mpwrk[r].set_type( mpwrk[r].type() + "*" );
@@ -243,7 +241,7 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
       for ( int r = 0; r < mpwrk.size(); r++ )
 	mpwrk[r].set_type( mpwrk[r].type().substr(0,3) );
       // and update
-      clipper::String seq0 = ProteinTools::chain_sequence( mpwrk );
+      seq0 = ProteinTools::chain_sequence( mpwrk );
       last_pos = del2 + ndel + 1;
     }  // done deletion correction
 

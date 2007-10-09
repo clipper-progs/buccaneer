@@ -36,6 +36,7 @@ target_fn, const std::vector<std::vector<double> >& args ) const
 
   // simplex loop
   int iw, ib;
+  iw = ib = 0;
   double f0(0.0), f1(0.0), f2(0.0);
   for ( int cyc = 0; cyc < max_cycles_; cyc++ ) {
     if ( debug_mode )  // DEBUG OUTPUT
