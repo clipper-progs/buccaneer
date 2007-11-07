@@ -8,6 +8,8 @@
 #include "buccaneer-sequence.h"
 #include "buccaneer-filter.h"
 
+#include <algorithm>
+
 
 clipper::RTop_orth Ca_ncsbuild::superpose( const clipper::MPolymer& mp1, const clipper::MPolymer& mp2 ) const
 {
