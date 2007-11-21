@@ -17,9 +17,9 @@ csequins.cpp buccaneer-sequence.cpp simulate-lib.cpp buccaneer-prot.cpp \
 buccaneer-lib.cpp
 
 
-INCLUDES = $(FFTW_CXXFLAGS) $(MMDB_CXXFLAGS)  $(CCP4_CXXFLAGS) \
+INCLUDES = $(CLIPPER_CXXFLAGS) $(FFTW_CXXFLAGS) $(MMDB_CXXFLAGS)  $(CCP4_CXXFLAGS) \
 	   -I$(includedir)
 
-LIBS = $(FFTW_LIBS) $(CCP4_LIBS) $(MMDB_LIBS) @LIBS@
+LIBS = $(CLIPPER_LIBS) $(FFTW_LIBS) $(CCP4_LIBS) $(MMDB_LIBS) @LIBS@
 
 
