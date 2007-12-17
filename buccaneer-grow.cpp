@@ -120,12 +120,18 @@ Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   Score_list<Rama_ang2> scores_l2( max_conf2 );
   Ca_group ca0, ca1, ca2;
   double r1, r2;
-  double phi0 = -9.999; // prev Ramachandran angle
-  if ( chain.size() > 1 ) phi0 = chain.ramachandran_phi( chain.size()-1 );
   ca0 = chain.back();  // start residue
   const double deg360 = clipper::Util::d2rad(359.0);
   const double deg20  = clipper::Util::d2rad( 20.0);
   const double deg30  = clipper::Util::d2rad( 30.0);
+  double phi0 = -9.999; // prev Ramachandran angle
+  if ( chain.size() > 1 ) {
+    double phi = chain.ramachandran_phi( chain.size()-1 );
+    int nallowed = 0;
+    for ( double psi = 0.0; psi < deg360; psi += deg20 )
+      if ( rama1.allowed( phi, psi ) ) nallowed++;
+    if ( nallowed > 0 ) phi0 = phi;
+  }
   // search all conformations of first residue
   for ( conf1.r1.psi = 0.0; conf1.r1.psi < deg360; conf1.r1.psi += deg20 )
     for ( conf1.r1.phi = 0.0; conf1.r1.phi < deg360; conf1.r1.phi += deg20 )
@@ -169,10 +175,10 @@ Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   args[2] = ra_best.r2.psi;
   args[3] = ra_best.r2.phi;
   args = tgt.refine( chain, args );
-      ca1 = ca0.next_ca_group( args[0], args[1] );
-      ca2 = ca1.next_ca_group( args[2], args[3] );
-      r2 = ( llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
-	     llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
+  ca1 = ca0.next_ca_group( args[0], args[1] );
+  ca2 = ca1.next_ca_group( args[2], args[3] );
+  r2 = ( llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
+	 llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
   // and return it
   return ca1;
 }
@@ -185,18 +191,24 @@ Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   Score_list<Rama_ang2> scores_l2( max_conf2 );
   Ca_group ca0, ca1, ca2;
   double r1, r2;
-  double psi0 = -9.999; // prev Ramachandran angle
-  if ( chain.size() > 1 ) psi0 = chain.ramachandran_psi( 0 );
   ca0 = chain.front();  // start residue
   const double deg360 = clipper::Util::d2rad(359.0);
   const double deg20  = clipper::Util::d2rad( 20.0);
   const double deg30  = clipper::Util::d2rad( 30.0);
+  double psi0 = -9.999; // prev Ramachandran angle
+  if ( chain.size() > 1 ) {
+    double psi = chain.ramachandran_psi( 0 );
+    int nallowed = 0;
+    for ( double phi = 0.0; phi < deg360; phi += deg20 )
+      if ( rama1.allowed( phi, psi ) ) nallowed++;
+    if ( nallowed > 0 ) psi0 = psi;
+  }
   // search all conformations of first residue
   for ( conf1.r1.phi = 0.0; conf1.r1.phi < deg360; conf1.r1.phi += deg20 ) 
     for ( conf1.r1.psi = 0.0; conf1.r1.psi < deg360; conf1.r1.psi += deg20 )
       if ( psi0 < -6.283 || rama1.allowed( conf1.r1.phi, psi0 ) ) {
-      ca1 = ca0.prev_ca_group( conf1.r1.phi, conf1.r1.psi );
-      r1 = llktarget.llk_approx( xmap, ca1.rtop_from_std_ori() );
+	ca1 = ca0.prev_ca_group( conf1.r1.phi, conf1.r1.psi );
+	r1 = llktarget.llk_approx( xmap, ca1.rtop_from_std_ori() );
       scores_l1.add( r1, conf1 );
     }
   // seach all conformations of second residue using best confirmations of first
@@ -234,10 +246,10 @@ Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   args[2] = ra_best.r2.phi;
   args[3] = ra_best.r2.psi;
   args = tgt.refine( chain, args );
-      ca1 = ca0.prev_ca_group( args[0], args[1] );
-      ca2 = ca1.prev_ca_group( args[2], args[3] );
-      r2 = ( llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
-	     llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
+  ca1 = ca0.prev_ca_group( args[0], args[1] );
+  ca2 = ca1.prev_ca_group( args[2], args[3] );
+  r2 = ( llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
+	 llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
   // and return it
   return ca1;
 }
@@ -337,3 +349,4 @@ std::vector<double> Target_fn_refine_c_terminal_build::refine( const Ca_chain& c
   Optimiser_simplex os( tol, 50, Optimiser_simplex::GRADIENT );
   return os( *this, args_init );
 }
+
