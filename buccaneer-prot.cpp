@@ -5,6 +5,9 @@
 
 #include <clipper/clipper-contrib.h>
 
+extern "C" {
+#include <string.h>
+}
 
 clipper::RTop_orth Ca_group::rtop_from_std_ori() const
 {

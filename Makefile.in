@@ -84,6 +84,22 @@ STRIP = @STRIP@
 VERSION = @VERSION@
 am__include = @am__include@
 am__quote = @am__quote@
+caniso_LDFLAGS = @caniso_LDFLAGS@
+cbuccaneer_LDFLAGS = @cbuccaneer_LDFLAGS@
+cecalc_LDFLAGS = @cecalc_LDFLAGS@
+cfft_LDFLAGS = @cfft_LDFLAGS@
+chltofom_LDFLAGS = @chltofom_LDFLAGS@
+cinvfft_LDFLAGS = @cinvfft_LDFLAGS@
+convert2mtz_LDFLAGS = @convert2mtz_LDFLAGS@
+cpatterson_LDFLAGS = @cpatterson_LDFLAGS@
+cphasecombine_LDFLAGS = @cphasecombine_LDFLAGS@
+cphasematch_LDFLAGS = @cphasematch_LDFLAGS@
+cpirate_LDFLAGS = @cpirate_LDFLAGS@
+csequins_LDFLAGS = @csequins_LDFLAGS@
+csfcalc_LDFLAGS = @csfcalc_LDFLAGS@
+csigmaa_LDFLAGS = @csigmaa_LDFLAGS@
+csymmatch_LDFLAGS = @csymmatch_LDFLAGS@
+ctruncate_LDFLAGS = @ctruncate_LDFLAGS@
 install_sh = @install_sh@
 bin_PROGRAMS = cbuccaneer csequins
 
@@ -127,14 +143,12 @@ am_cbuccaneer_OBJECTS = buccaneer-build.$(OBJEXT) \
 cbuccaneer_OBJECTS = $(am_cbuccaneer_OBJECTS)
 cbuccaneer_LDADD = $(LDADD)
 cbuccaneer_DEPENDENCIES =
-cbuccaneer_LDFLAGS =
 am_csequins_OBJECTS = csequins.$(OBJEXT) buccaneer-sequence.$(OBJEXT) \
 	simulate-lib.$(OBJEXT) buccaneer-prot.$(OBJEXT) \
 	buccaneer-lib.$(OBJEXT)
 csequins_OBJECTS = $(am_csequins_OBJECTS)
 csequins_LDADD = $(LDADD)
 csequins_DEPENDENCIES =
-csequins_LDFLAGS =
 
 DEFS = @DEFS@
 DEFAULT_INCLUDES =  -I. -I$(srcdir)
