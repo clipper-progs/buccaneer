@@ -94,6 +94,7 @@ cinvfft_LDFLAGS = @cinvfft_LDFLAGS@
 cmakereference_LDFLAGS = @cmakereference_LDFLAGS@
 cmaplocal_LDFLAGS = @cmaplocal_LDFLAGS@
 convert2mtz_LDFLAGS = @convert2mtz_LDFLAGS@
+cparrot_LDFLAGS = @cparrot_LDFLAGS@
 cpatterson_LDFLAGS = @cpatterson_LDFLAGS@
 cphasecombine_LDFLAGS = @cphasecombine_LDFLAGS@
 cphasematch_LDFLAGS = @cphasematch_LDFLAGS@
@@ -107,16 +108,17 @@ install_sh = @install_sh@
 bin_PROGRAMS = cbuccaneer csequins
 
 cbuccaneer_SOURCES = \
-buccaneer-build.cpp     buccaneer-join.cpp      buccaneer-sequence.cpp \
-buccaneer-correct.cpp   buccaneer-lib.cpp       cbuccaneer.cpp \
-buccaneer-filter.cpp    buccaneer-link.cpp      simplex-lib.cpp \
-buccaneer-find.cpp      buccaneer-prot.cpp      simulate-lib.cpp \
-buccaneer-grow.cpp      buccaneer-prune.cpp 	buccaneer-ncsbuild.cpp \
-buccaneer-build.h       buccaneer-join.h        buccaneer-sequence.h \
-buccaneer-correct.h     buccaneer-lib.h         simplex-lib.h \
-buccaneer-filter.h      buccaneer-link.h        simulate-lib.h \
-buccaneer-find.h        buccaneer-prot.h \
-buccaneer-grow.h        buccaneer-prune.h	buccaneer-ncsbuild.h
+buccaneer-build.cpp    buccaneer-join.h        buccaneer-prune.cpp \
+buccaneer-build.h      buccaneer-lib.cpp       buccaneer-prune.h \
+buccaneer-correct.cpp  buccaneer-lib.h         buccaneer-sequence.cpp \
+buccaneer-correct.h    buccaneer-link.cpp      buccaneer-sequence.h \
+buccaneer-filter.cpp   buccaneer-link.h        buccaneer-util.cpp \
+buccaneer-filter.h     buccaneer-ncsbuild.cpp  buccaneer-util.h \
+buccaneer-find.cpp     buccaneer-ncsbuild.h    cbuccaneer.cpp \
+buccaneer-find.h       buccaneer-prep.cpp      simplex-lib.cpp \
+buccaneer-grow.cpp     buccaneer-prep.h        simplex-lib.h \
+buccaneer-grow.h       buccaneer-prot.cpp      simulate-lib.cpp \
+buccaneer-join.cpp     buccaneer-prot.h        simulate-lib.h
 
 
 csequins_SOURCES = \
@@ -124,8 +126,8 @@ csequins.cpp buccaneer-sequence.cpp simulate-lib.cpp buccaneer-prot.cpp \
 buccaneer-lib.cpp
 
 
-INCLUDES = $(CLIPPER_CXXFLAGS) $(FFTW_CXXFLAGS) $(MMDB_CXXFLAGS)  $(CCP4_CXXFLAGS) \
-	   -I$(includedir)
+INCLUDES = $(CLIPPER_CXXFLAGS) $(FFTW_CXXFLAGS) $(MMDB_CXXFLAGS) \
+           $(CCP4_CXXFLAGS) -I$(includedir)
 
 
 LIBS = $(CLIPPER_LIBS) $(FFTW_LIBS) $(CCP4_LIBS) $(MMDB_LIBS) @LIBS@
@@ -136,13 +138,14 @@ bin_PROGRAMS = cbuccaneer$(EXEEXT) csequins$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS)
 
 am_cbuccaneer_OBJECTS = buccaneer-build.$(OBJEXT) \
-	buccaneer-join.$(OBJEXT) buccaneer-sequence.$(OBJEXT) \
-	buccaneer-correct.$(OBJEXT) buccaneer-lib.$(OBJEXT) \
-	cbuccaneer.$(OBJEXT) buccaneer-filter.$(OBJEXT) \
-	buccaneer-link.$(OBJEXT) simplex-lib.$(OBJEXT) \
-	buccaneer-find.$(OBJEXT) buccaneer-prot.$(OBJEXT) \
-	simulate-lib.$(OBJEXT) buccaneer-grow.$(OBJEXT) \
-	buccaneer-prune.$(OBJEXT) buccaneer-ncsbuild.$(OBJEXT)
+	buccaneer-prune.$(OBJEXT) buccaneer-lib.$(OBJEXT) \
+	buccaneer-correct.$(OBJEXT) buccaneer-sequence.$(OBJEXT) \
+	buccaneer-link.$(OBJEXT) buccaneer-filter.$(OBJEXT) \
+	buccaneer-util.$(OBJEXT) buccaneer-ncsbuild.$(OBJEXT) \
+	buccaneer-find.$(OBJEXT) cbuccaneer.$(OBJEXT) \
+	buccaneer-prep.$(OBJEXT) simplex-lib.$(OBJEXT) \
+	buccaneer-grow.$(OBJEXT) buccaneer-prot.$(OBJEXT) \
+	simulate-lib.$(OBJEXT) buccaneer-join.$(OBJEXT)
 cbuccaneer_OBJECTS = $(am_cbuccaneer_OBJECTS)
 cbuccaneer_LDADD = $(LDADD)
 cbuccaneer_DEPENDENCIES =
@@ -168,9 +171,11 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-lib.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-link.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-ncsbuild.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prep.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prot.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prune.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-sequence.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/buccaneer-util.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/cbuccaneer.Po ./$(DEPDIR)/csequins.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/simplex-lib.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/simulate-lib.Po
@@ -244,9 +249,11 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-lib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-link.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-ncsbuild.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prep.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prot.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prune.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-sequence.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-util.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cbuccaneer.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/csequins.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/simplex-lib.Po@am__quote@
