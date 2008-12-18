@@ -1,9 +1,14 @@
 /*! \file buccaneer-sequence.cpp buccaneer library */
-/* (C) 2006 Kevin Cowtan & University of York all rights reserved */
+/* (C) 2006-2008 Kevin Cowtan & University of York all rights reserved */
 
 #include "buccaneer-sequence.h"
 
 #include <clipper/clipper-contrib.h>
+
+
+int Ca_sequence::ncpu = 0;
+bool Ca_sequence::semet_ = false;
+clipper::MiniMol Ca_sequence::molprior;
 
 
 // cumulative normal distribution function
@@ -22,6 +27,30 @@ double Ca_sequence::phi_approx( double z )
     p = 1.0 - ( exp(-0.5*z*z) / (1.2533141373*(z+sqrt(z*z+2.546479089470))) );
   return p;
 }
+
+
+// retrieve scores cached in a residue property (checking coords are valid)
+std::vector<double> Ca_sequence::get_cached_scores( clipper::MMonomer& mm, const Ca_group& ca )
+{
+  if ( mm.exists_property( "SEQDAT" ) ) {
+    const Sequence_data& sd = static_cast<const clipper::Property<Sequence_data>&>(mm.get_property( "SEQDAT" )).value();
+    if ( ( ca.coord_n()  - sd.ca.coord_n()  ).lengthsq() < 1.0e-3 &&
+	 ( ca.coord_ca() - sd.ca.coord_ca() ).lengthsq() < 1.0e-3 &&
+	 ( ca.coord_c()  - sd.ca.coord_c()  ).lengthsq() < 1.0e-3 )
+      return sd.data;
+  }
+  return std::vector<double>();
+}
+
+
+// cache scores in a residue property
+void Ca_sequence::set_cached_scores( clipper::MMonomer& mm, const Ca_group& ca, const std::vector<double>& scr )
+{
+  if ( mm.exists_property( "SEQDAT" ) ) mm.delete_property( "SEQDAT" );
+  mm.set_property( "SEQDAT",
+		   clipper::Property<Sequence_data>(Sequence_data(ca,scr)) );
+}
+
 
 // return fraction of first sequence which overlaps the second
 double Ca_sequence::sequence_overlap( const clipper::String& seq1, const clipper::String& seq2 )
@@ -44,8 +73,8 @@ double Ca_sequence::sequence_similarity( const clipper::String& seq1, const clip
   int t1, t2, ns, nm;;
   ns = nm = 0;
   for ( int i = 0; i < lmin; i++ ) {
-    t1 = ProteinTools::residue_index( seq1.substr( i, 1 ) );
-    t2 = ProteinTools::residue_index( seq2.substr( i, 1 ) );
+    t1 = ProteinTools::residue_index_translate( seq1[i] );
+    t2 = ProteinTools::residue_index_translate( seq2[i] );
     if ( t1 >= 0 || t2 >= 0 ) {
       ns++;
       if ( t1 == t2 ) nm++;
@@ -114,7 +143,7 @@ std::pair<double,std::pair<int,int> > Ca_sequence::sequence_score( const std::ve
     if ( subseq[r] == '+' || subseq[r] == '-' ) {
       score[r] = 3.0;  // insertion/deletion penalty
     } else {
-      int t = ProteinTools::residue_index( subseq.substr( r, 1 ) );
+      int t = ProteinTools::residue_index_translate( subseq[r] );
       if ( t >= 0 ) score[r] = scores[r][t];  // add residue z-score
     }
   }
@@ -158,7 +187,7 @@ std::vector<clipper::String> Ca_sequence::sequence_align( const std::vector<std:
   // construct a sequence alignment matrix from the sequencing data
   clipper::Matrix<double> s(m,n), c(m,n);
   for ( int i = 0; i < m; i++ ) {
-    int t = ProteinTools::residue_index( seq.substr(i,1) );
+    int t = ProteinTools::residue_index_translate( seq[i] );
     for ( int j = 0; j < n; j++ ) s(i,j) = scores[j][t];
   }
 
@@ -301,31 +330,31 @@ Score_list<clipper::String> Ca_sequence::sequence_match( const std::vector<std::
 
 /*! Sequence a chain based on the map LLK target, and available
   sequence ranges. */
-Score_list<clipper::String> Ca_sequence::sequence_chain( const clipper::MChain& chain, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llktarget, const clipper::MMoleculeSequence& seq )
+Score_list<clipper::String> Ca_sequence::sequence_chain( clipper::MChain& chain, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llktarget, const clipper::MMoleculeSequence& seq )
 {
   typedef clipper::MMonomer Mm;
   int nres = chain.size();
   int ntyp = llktarget.size();
 
   // for each chain, classify each residue against the density
-  clipper::Coord_orth coord_n, coord_ca, coord_c;
-  std::vector<std::vector<double> > scores;
+  std::vector<std::vector<double> > scores( nres );
   for ( int res = 0; res < nres; res++ ) {
     std::vector<double> scores_type( ntyp, 0.0 );
-    // find ca, c, n
-    int index_n  = chain[res].lookup( " N  ", clipper::MM::ANY );
-    int index_ca = chain[res].lookup( " CA ", clipper::MM::ANY );
-    int index_c  = chain[res].lookup( " C  ", clipper::MM::ANY );
-    // if we have all three atoms, then add residue
-    if ( index_ca >= 0 && index_c >= 0 && index_n >= 0 ) {
-      coord_n  = chain[res][index_n].coord_orth();
-      coord_ca = chain[res][index_ca].coord_orth();
-      coord_c  = chain[res][index_c].coord_orth();
-      Ca_group ca( coord_n, coord_ca, coord_c );
-      for ( int t = 0; t < ntyp; t++ )
-	scores_type[t] = llktarget[t].target( xmap, ca.rtop_beta_carbon() );
+    Ca_group ca( chain[res] );
+    if ( !ca.is_null() ) {
+      // OPTIMIZATION: check for cached result
+      std::vector<double> scores_tmp = get_cached_scores( chain[res], ca );
+      if ( scores_tmp.size() != ntyp ) {  // normal path
+	// CALCULATION
+	for ( int t = 0; t < ntyp; t++ )
+	  scores_type[t] = llktarget[t].target( xmap, ca.rtop_beta_carbon() );
+	// OPTIMIZATION: cache result
+	set_cached_scores( chain[res], ca, scores_type );
+      } else {                            // fast path
+	scores_type = scores_tmp;
+      }
     }
-    scores.push_back( scores_type );
+    scores[res] = scores_type;
   }
 
   // normalise across rows by mean with moving average
@@ -367,6 +396,41 @@ Score_list<clipper::String> Ca_sequence::sequence_chain( const clipper::MChain& 
       scores[r][t] = ( scores[r][t] - s1 ) / s2;
   }
 
+  // adjust according to any prior sequence info (heavy atom or model)
+  if ( !molprior.is_null() ) {
+    std::vector<clipper::MAtomIndexSymmetry> atoms;
+    const double nb_rad = 8.0;
+    clipper::MAtomNonBond nb( molprior, nb_rad );
+    for ( int r = 0; r < nres; r++ ) {
+      Ca_group ca( chain[r] );
+      if ( !ca.is_null() ) {
+	// score against prior
+	clipper::Coord_frac cf1, cf2;
+	clipper::Coord_orth co = ca.coord_cb();
+	atoms = nb.atoms_near( co, nb_rad );
+	cf1 = co.coord_frac( xmap.cell() );
+	for ( int i = 0; i < atoms.size(); i++ ) {
+	  const clipper::MAtom& atom =
+	    molprior[atoms[i].polymer()][atoms[i].monomer()][atoms[i].atom()];
+	  cf2 = atom.coord_orth().coord_frac( xmap.cell() );
+	  cf2 = xmap.spacegroup().symop( atoms[i].symmetry() ) * cf2;
+	  cf2 = cf2.lattice_copy_near( cf1 );
+	  double d2 = ( cf2 - cf1 ).lengthsq( xmap.cell() );
+	  if ( d2 <= nb_rad * nb_rad ) {
+	    int t = atoms[i].monomer();
+	    double rad = atom.u_iso();
+	    double w = atom.occupancy();
+	    double x = sqrt( d2 ) / rad;
+	    double f = 0.0;
+	    if      ( x < 1.0 ) f = 1.0 - 0.5 * clipper::Util::sqr( x );
+	    else if ( x < 2.0 ) f = 0.5 * clipper::Util::sqr( x - 2.0 );
+	    scores[r][t] = scores[r][t] - w * f;
+	  }
+	}
+      }
+    }
+  }
+
   // do sequence match
   return sequence_match( scores, seq );
 }
@@ -378,32 +442,34 @@ void Ca_sequence::sequence_apply( clipper::MChain& chain, const clipper::String&
 {
   if ( chain.size() != seq.length() ) clipper::Message::message( clipper::Message_fatal( "Sequence: internal error - length mismatch" ) );
 
+  const clipper::String unktyp = "UNK";
+
   // make old and new sequences
   int m, m1, m2;
-  clipper::MChain oldseq, newseq;
-  clipper::MMonomer mm;
+  std::vector<clipper::String> oldseq(chain.size()), newseq(chain.size());
+  std::vector<int> oldtyp(chain.size()), newtyp(chain.size());
   for ( m = 0; m < chain.size(); m++ ) {
-    mm.set_type( chain[m].type() );
-    oldseq.insert( mm );
-    int t = ProteinTools::residue_index( seq.substr(m,1) );
-    mm.set_type( "UNK" );
-    if ( t >= 0 ) mm.set_type( ProteinTools::residue_code_3( t ) );
-    if ( seq[m] == '+' ) mm.set_type( "+++" );
-    if ( seq[m] == '-' ) mm.set_type( "---" );
-    newseq.insert( mm );
+    oldseq[m] = chain[m].type();
+    int t = ProteinTools::residue_index_translate( seq[m] );
+    if ( t >= 0 ) newseq[m] = ProteinTools::residue_code_3( t );
+    else if ( seq[m] == '+' ) newseq[m] = "+++";
+    else if ( seq[m] == '-' ) newseq[m] = "---";
+    else newseq[m] = unktyp;
+    oldtyp[m] = ProteinTools::residue_index_3( oldseq[m] );
+    newtyp[m] = ProteinTools::residue_index_3( newseq[m] );
   }
 
   // now find contiguous regions in oldseq trace
   std::vector<std::pair<int,int> > regions;
   m = 0;
-  while ( m < oldseq.size() ) {
-    while ( m < oldseq.size() ) {
-      if ( oldseq[m].type() != "UNK" ) break;
+  while ( m < oldtyp.size() ) {
+    while ( m < oldtyp.size() ) {
+      if ( oldtyp[m] >= 0 ) break;
       m++;
     }
     m1 = m;
-    while ( m < oldseq.size() ) {
-      if ( oldseq[m].type() == "UNK" ) break;
+    while ( m < oldtyp.size() ) {
+      if ( oldtyp[m] <  0 ) break;
       m++;
     }
     m2 = m;
@@ -416,24 +482,21 @@ void Ca_sequence::sequence_apply( clipper::MChain& chain, const clipper::String&
     m1 = regions[i].first;
     m2 = regions[i].second;
     for ( m = m1; m < m2; m++ )
-      if ( newseq[m].type() != "UNK" && newseq[m].type() != oldseq[m].type() )
+      if ( newtyp[m] >= 0 && newtyp[m] != oldtyp[m] )
 	clash = true;
     if ( m1 > 0 )
-      if ( newseq[m1-1].type() != "UNK" && newseq[m1].type() == "UNK" )
+      if ( newtyp[m1-1] >= 0 && newtyp[m1] < 0 )
 	clash = true;
-    if ( m2 < newseq.size() )
-      if ( newseq[m2-1].type() == "UNK" && newseq[m2].type() != "UNK" )
+    if ( m2 < newtyp.size() )
+      if ( newtyp[m2-1] < 0 && newtyp[m2] >= 0 )
 	clash = true;
-    if ( clash )
-      for ( m = m1; m < m2; m++ ) oldseq[m].set_type( "UNK" );
+    if ( clash ) for ( m = m1; m < m2; m++ ) oldseq[m] = unktyp;
   }
 
   // combine the remaining types
   for ( m = 0; m < newseq.size(); m++ )
-    if ( newseq[m].type() != "UNK" )
-      chain[m].set_type( newseq[m].type() );
-    else
-      chain[m].set_type( oldseq[m].type() );
+    if ( newseq[m] != unktyp ) chain[m].set_type( newseq[m] );
+    else                       chain[m].set_type( oldseq[m] );
 
   /*
   std::cout << "Applying sequence on chain " << chain.id() << " length " << chain.size() << "\n";
@@ -443,7 +506,34 @@ void Ca_sequence::sequence_apply( clipper::MChain& chain, const clipper::String&
 }
 
 
-bool Ca_sequence::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq )
+Score_list<clipper::String> Ca_sequence::sequence( clipper::MChain& chain, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llksample, const clipper::MMoleculeSequence& seq, const double& reliability )
+{
+  // do the sequencing
+  Score_list<clipper::String> matches = sequence_chain( chain, xmap, llksample, seq );
+
+  // now check for multiple matches
+  matches = sequence_combine( matches, reliability );
+
+  // test the reliability of the sequence match
+  bool apply = false;
+  if ( matches.size() >= 2 ) {
+    double r = Ca_sequence::phi_approx( matches.score(0) - matches.score(1) );
+    if ( r < 1.0-reliability ) apply = true;
+  }
+
+  // apply sequence
+  if ( apply ) sequence_apply( chain, matches[0] );
+
+  // translate MSE
+  if ( semet_ )
+    for ( int res = 0; res < chain.size(); res++ )
+      if ( chain[res].type() == "MET" ) chain[res].set_type( "MSE" );
+
+  return matches;
+}
+
+
+bool Ca_sequence::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq )
 {
   typedef clipper::MMonomer Mm;
 
@@ -453,37 +543,28 @@ bool Ca_sequence::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& m
     llksample[t] = llktarget[t].sampled();
 
   // split into separate chains
-  ProteinTools::chain_tidy( mol2, mol1 );
+  ProteinTools::chain_tidy( mol );
 
-  // set relibility criteria and docking count
+  // do sequencing
+  history = std::vector<Score_list<clipper::String> >( mol.size() );
+  for ( int chn = 0; chn < mol.size(); chn++ )
+    history[chn] = sequence( mol[chn], xmap, llksample, seq, reliability_ );
+  /*
+  Sequence_threaded seqnc( mol, xmap, llksample, seq, reliability_ );
+  seqnc( ncpu );
+  mol = seqnc.result();
+  history = seqnc.history();
+  */
+
+  // break chains where the sequence is broken
+  ProteinTools::break_chains( mol, xmap );
+
+  // count sequenced residues
   num_seq = 0;
-
-  // now loop over chains
-  for ( int chn = 0; chn < mol2.size(); chn++ ) if ( mol2[chn].size() > 5 ) {
-    // calculate possible matches to this chain
-    Score_list<clipper::String> matches =
-      sequence_chain( mol2[chn], xmap, llksample, seq );
-
-    // now check for multiple matches
-    matches = sequence_combine( matches, reliability_ );
-
-    // test the reliability of the sequence match
-    bool apply = false;
-    if ( matches.size() >= 2 ) {
-      double r = phi_approx( matches.score(0) - matches.score(1) );
-      if ( r < 1.0-reliability_ ) apply = true;
-    }
-
-    // apply sequence
-    if ( apply ) sequence_apply( mol2[chn], matches[0] );
-
-    // count sequenced residues
-    for ( int res = 0; res < mol2[chn].size(); res++ )
-      if ( mol2[chn][res].type() != "UNK" ) num_seq++;
-
-    // save some info for future output
-    history.push_back( matches );
-  }
+  for ( int chn = 0; chn < mol.size(); chn++ )
+    if ( mol[chn].size() > 5 )
+      for ( int res = 0; res < mol[chn].size(); res++ )
+	if ( mol[chn][res].type() != "UNK" ) num_seq++;
 
   return true;
 }
@@ -509,4 +590,73 @@ clipper::String Ca_sequence::format() const
     }
   }
   return result;
+}
+
+
+/* set a prior model. Complete residues bias residue type by Cbeta
+   position, and S/Se atoms weight in favour of CYS/MET/MSE. If the
+   chain ID is '!', the radius and weight can be specified an B and
+   occ. */
+void Ca_sequence::set_prior_model( const clipper::MiniMol& mol )
+{
+  // make a prior model with 1 chain of 20 residues
+  molprior.init( mol.spacegroup(), mol.cell() );
+  clipper::MPolymer mp;
+  for ( int t = 0; t < 20; t++ ) {  // one for each residue type
+    clipper::MMonomer mm;
+    mm.set_seqnum( t + 1 );
+    mm.set_type( ProteinTools::residue_code_3( t ) );
+    mp.insert( mm );
+  }
+
+  // set up prior dummy atoms
+  clipper::MAtom atomcb, atomsu, atomse, atom;
+  atomcb.set_id( " CB " ); atomcb.set_element( "C" );
+  atomcb.set_u_iso( 4.0 ); atomcb.set_occupancy( 1.0 );
+  atomsu.set_id( " S  " ); atomsu.set_element( "S" );
+  atomsu.set_u_iso( 3.0 ); atomsu.set_occupancy( 4.0 );
+  atomse.set_id( "SE  " ); atomse.set_element( "SE" );
+  atomse.set_u_iso( 4.0 ); atomse.set_occupancy( 4.0 );
+  const int t_cys = ProteinTools::residue_index_3( "CYS" );
+  const int t_met = ProteinTools::residue_index_3( "MET" );
+
+  // insert Cbeta atoms to bias residue probability
+  for ( int c = 0; c < mol.size(); c++ )
+    for ( int r = 0; r < mol[c].size(); r++ ) {
+      Ca_group ca( mol[c][r] );
+      if ( !ca.is_null() ) {
+	int t = ProteinTools::residue_index_3( mol[c][r].type() );
+	atom = atomcb;
+	atom.set_coord_orth( ca.coord_cb() );
+	mp[t].insert( atom );
+      }
+    }
+
+  // insert Se atoms to bias MET/MSE probability
+  for ( int c = 0; c < mol.size(); c++ )
+    for ( int r = 0; r < mol[c].size(); r++ )
+      for ( int a = 0; a < mol[c][r].size(); a++ ) {
+	clipper::String atm = mol[c][r][a].id().trim();
+	clipper::String ele = mol[c][r][a].element();
+	bool override = ( mol[c].id() == "!" );
+	double u = clipper::Util::u2b( mol[c][r][a].u_iso() );
+	double o = mol[c][r][a].occupancy();
+	bool su = ( ele == "S"  || atm == "S"  || atm == "SG" || atm == "SD" );
+	bool se = ( ele == "SE" || atm == "SE" );
+	if ( su ) {
+	  atom = atomsu;
+	  atom.set_coord_orth( mol[c][r][a].coord_orth() );
+	  if ( override ) { atom.set_u_iso( u ); atom.set_occupancy( o ); }
+	  mp[ t_cys ].insert( atom );
+	}
+	if ( ( semet_ && se ) || ( !semet_ && su ) ) {
+	  atom = atomse;
+	  atom.set_coord_orth( mol[c][r][a].coord_orth() );
+	  if ( override ) { atom.set_u_iso( u ); atom.set_occupancy( o ); }
+	  mp[ t_met ].insert( atom );
+	}
+      }
+
+  // Store the pseudo-chain
+  molprior.insert( mp );
 }

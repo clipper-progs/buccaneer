@@ -9,7 +9,7 @@
 class Ca_prune {
  public:
   Ca_prune( clipper::ftype rad = 2.0 ) : rad_(rad) {}
-  bool operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 ) const;
+  bool operator() ( clipper::MiniMol& mol ) const;
  private:
   clipper::ftype rad_;
 };

@@ -6,77 +6,56 @@
 #include <clipper/clipper-contrib.h>
 
 
+const int Ca_grow::max_conf1 = 50;
+const int Ca_grow::max_conf2 = 30;
+int Ca_grow::ncpu = 0;
+
+
 Ca_grow::Ca_grow( int n_grow )
 {
   ngrow = n_grow;
-  max_conf1 = 50;
-  max_conf2 = 30;
-  rama1 = clipper::Ramachandran( clipper::Ramachandran::All );
-  rama2 = clipper::Ramachandran( clipper::Ramachandran::NonGly );
 }
 
 
-bool Ca_grow::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget ) const
+bool Ca_grow::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget ) const
 {
+  const clipper::MiniMol mold = mol;
+
   // loop over chains, finding starting chains to expand
   std::vector<Ca_chain> chains;
   Ca_chain chain;
-  for ( int chn = 0; chn < mol1.size(); chn++ )
-    for ( int res = 0; res < mol1[chn].size(); res++ ) {
-      // find ca, c, n
-      int index_n  = mol1[chn][res].lookup( " N  ", clipper::MM::ANY );
-      int index_ca = mol1[chn][res].lookup( " CA ", clipper::MM::ANY );
-      int index_c  = mol1[chn][res].lookup( " C  ", clipper::MM::ANY );
-      // if we have all three atoms, then add residue
-      if ( index_ca >= 0 && index_c >= 0 && index_n >= 0 ) {
-	clipper::Coord_orth coord_n  = mol1[chn][res][index_n].coord_orth();
-	clipper::Coord_orth coord_ca = mol1[chn][res][index_ca].coord_orth();
-	clipper::Coord_orth coord_c  = mol1[chn][res][index_c].coord_orth();
+  for ( int chn = 0; chn < mold.size(); chn++ )
+    for ( int res = 0; res < mold[chn].size(); res++ ) {
+      Ca_group ca( mold[chn][res] );
+      if ( !ca.is_null() ) {
 	// check if we must start a new chain
 	if ( chain.size() > 0 )
-	  if ( (chain.back().coord_c()-coord_n).lengthsq() > 2.25 ) {
+	  if ( (chain.back().coord_c()-ca.coord_n()).lengthsq() > 2.25 ) {
 	    chains.push_back( chain );
 	    chain.clear();
 	  }
 	// add this atom to chain
-	chain.push_back( Ca_group( coord_n, coord_ca, coord_c ) );
+	chain.push_back( ca );
       }
     }
   if ( chain.size() > 0 ) chains.push_back( chain );
 
   // establish map statistics to determine stopping value for building
-  std::vector<double> scr;
-  for ( int i = 0; i < 5000; i++ ) {
-    double r = double(i);
-    clipper::Euler_ccp4 rot( 2.0*r, 3.0*r, 5.0*r );
-    clipper::Rotation ro( rot );
-      clipper::Coord_grid cg( 23*i, 29*i, 31*i );
-      clipper::Coord_orth trn =
-	cg.coord_frac( xmap.grid_sampling() ).coord_orth( xmap.cell() );
-      clipper::RTop_orth rtop( ro.matrix(), trn );
-      double s = llktarget.llk( xmap, rtop );
-      scr.push_back( s );
-  }
-  std::sort( scr.begin(), scr.end() );
-  double cutoff = scr[50];  // select score for top 1% of cases
+  double cutoff = llktarget.llk_distribution( 0.01 );
 
-  // now build up to 20 residues each way
-  Ca_group ca;
-  for ( int chn = 0; chn < chains.size(); chn++ ) {
-    for ( int i = 0; i < ngrow; i++ ) {
-      ca = next_ca_group( chains[chn], xmap, llktarget );
-      if ( llktarget.llk( xmap, ca.rtop_from_std_ori() ) > cutoff ) break;
-      chains[chn].push_back( ca );
-    }
-    for ( int i = 0; i < ngrow; i++ ) {
-      ca = prev_ca_group( chains[chn], xmap, llktarget );
-      if ( llktarget.llk( xmap, ca.rtop_from_std_ori() ) > cutoff ) break;
-      chains[chn].push_front( ca );
-    }
-  }
+  // grow the chains
+  clipper::Ramachandran rama1( clipper::Ramachandran::All );
+  clipper::Ramachandran rama2( clipper::Ramachandran::NonGly );
+  for ( int chn = 0; chn < chains.size(); chn++ )
+    grow( chains[chn], xmap, llktarget,	rama1, rama2, cutoff, ngrow );
+  /*
+  Grow_threaded grow( chains, xmap, llktarget, cutoff, ngrow );
+  grow( ncpu );
+  chains = grow.result();
+  */
 
   // make a new mmdb
-  mol2 = clipper::MiniMol( mol1.spacegroup(), mol1.cell() );
+  mol = clipper::MiniMol( mold.spacegroup(), mold.cell() );
   for ( int chn = 0; chn < chains.size(); chn++ ) {
     clipper::MPolymer chain;
     int ires = 1;
@@ -104,16 +83,34 @@ bool Ca_grow::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1,
       residue.set_seqnum( ires++ );
       chain.insert( residue );
     }
-    mol2.insert( chain );
+    mol.insert( chain );
   }
 
   // restore the residue types, if any
-  ProteinTools::copy_residue_types( mol2, mol1 );
+  ProteinTools::copy_residue_types( mol, mold );
   return true;
 }
 
 
-Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget ) const
+void Ca_grow::grow( Ca_chain& chain, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const clipper::Ramachandran& rama1, const clipper::Ramachandran& rama2, const double& cutoff, const int& ngrow )
+{
+  Ca_group ca;
+  for ( int i = 0; i < ngrow; i++ ) {
+    ca = Ca_grow::next_ca_group( chain, xmap, llktarget, rama1, rama2 );
+    if ( ca.is_null() ) break;
+    if ( llktarget.llk( xmap, ca.rtop_from_std_ori() ) > cutoff ) break;
+    chain.push_back( ca );
+  }
+  for ( int i = 0; i < ngrow; i++ ) {
+    ca = Ca_grow::prev_ca_group( chain, xmap, llktarget, rama1, rama2 );
+    if ( ca.is_null() ) break;
+    if ( llktarget.llk( xmap, ca.rtop_from_std_ori() ) > cutoff ) break;
+    chain.push_front( ca );
+  }
+}
+
+
+Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const clipper::Ramachandran& rama1, const clipper::Ramachandran& rama2 )
 {
   Rama_ang1 conf1; Rama_ang2 conf2;
   Score_list<Rama_ang1> scores_l1( max_conf1 );
@@ -125,13 +122,7 @@ Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   const double deg20  = clipper::Util::d2rad( 20.0);
   const double deg30  = clipper::Util::d2rad( 30.0);
   double phi0 = -9.999; // prev Ramachandran angle
-  if ( chain.size() > 1 ) {
-    double phi = chain.ramachandran_phi( chain.size()-1 );
-    int nallowed = 0;
-    for ( double psi = 0.0; psi < deg360; psi += deg20 )
-      if ( rama1.allowed( phi, psi ) ) nallowed++;
-    if ( nallowed > 0 ) phi0 = phi;
-  }
+  if ( chain.size() > 1 ) phi0 = chain.ramachandran_phi( chain.size()-1 );
   // search all conformations of first residue
   for ( conf1.r1.psi = 0.0; conf1.r1.psi < deg360; conf1.r1.psi += deg20 )
     for ( conf1.r1.phi = 0.0; conf1.r1.phi < deg360; conf1.r1.phi += deg20 )
@@ -154,6 +145,7 @@ Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
 	}
   }
   //return ca0.next_ca_group( scores_l2[0].r1.psi, scores_l2[0].r1.phi );
+  if ( scores_l2.size() == 0 ) return Ca_group::null();
   // now calculate full likelihood scores and pick best
   double ll_best = 1.0e6;
   Rama_ang2 ra_best = scores_l2[0];
@@ -176,15 +168,15 @@ Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   args[3] = ra_best.r2.phi;
   args = tgt.refine( chain, args );
   ca1 = ca0.next_ca_group( args[0], args[1] );
-  ca2 = ca1.next_ca_group( args[2], args[3] );
-  r2 = ( llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
-	 llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
+  //ca2 = ca1.next_ca_group( args[2], args[3] );
+  //r2 = ( llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
+  //       llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
   // and return it
   return ca1;
 }
 
 
-Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget ) const
+Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const clipper::Ramachandran& rama1, const clipper::Ramachandran& rama2 )
 {
   Rama_ang1 conf1; Rama_ang2 conf2;
   Score_list<Rama_ang1> scores_l1( max_conf1 );
@@ -196,13 +188,7 @@ Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   const double deg20  = clipper::Util::d2rad( 20.0);
   const double deg30  = clipper::Util::d2rad( 30.0);
   double psi0 = -9.999; // prev Ramachandran angle
-  if ( chain.size() > 1 ) {
-    double psi = chain.ramachandran_psi( 0 );
-    int nallowed = 0;
-    for ( double phi = 0.0; phi < deg360; phi += deg20 )
-      if ( rama1.allowed( phi, psi ) ) nallowed++;
-    if ( nallowed > 0 ) psi0 = psi;
-  }
+  if ( chain.size() > 1 ) psi0 = chain.ramachandran_psi( 0 );
   // search all conformations of first residue
   for ( conf1.r1.phi = 0.0; conf1.r1.phi < deg360; conf1.r1.phi += deg20 ) 
     for ( conf1.r1.psi = 0.0; conf1.r1.psi < deg360; conf1.r1.psi += deg20 )
@@ -225,6 +211,7 @@ Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
 	}
   }
   //return ca0.prev_ca_group( scores_l2[0].r1.phi, scores_l2[0].r1.psi );
+  if ( scores_l2.size() == 0 ) return Ca_group::null();
   // now calculate full likelihood scores and pick best
   double ll_best = 1.0e6;
   Rama_ang2 ra_best = scores_l2[0];
@@ -247,13 +234,15 @@ Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   args[3] = ra_best.r2.psi;
   args = tgt.refine( chain, args );
   ca1 = ca0.prev_ca_group( args[0], args[1] );
-  ca2 = ca1.prev_ca_group( args[2], args[3] );
-  r2 = ( llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
-	 llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
+  //ca2 = ca1.prev_ca_group( args[2], args[3] );
+  //r2 = ( llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
+  //       llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
   // and return it
   return ca1;
 }
 
+
+// target function for refinement of terminals
 
 Target_fn_refine_n_terminal_build::Target_fn_refine_n_terminal_build( const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const clipper::Ramachandran& rama1, const clipper::Ramachandran& rama2, const double& rot_step )
 {
@@ -349,4 +338,3 @@ std::vector<double> Target_fn_refine_c_terminal_build::refine( const Ca_chain& c
   Optimiser_simplex os( tol, 50, Optimiser_simplex::GRADIENT );
   return os( *this, args_init );
 }
-

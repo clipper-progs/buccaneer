@@ -17,6 +17,8 @@ Optimiser_simplex::Optimiser_simplex( double tolerance, int max_cycles, TYPE typ
 std::vector<double> Optimiser_simplex::operator() ( const Target_fn_order_zero&
 target_fn, const std::vector<std::vector<double> >& args ) const
 {
+  enum STEP { UNKN, EXTN, NRML, CTRN, CTRX };
+
   // check input
   int size = target_fn.num_params();
   if ( args.size() != size+1 )
@@ -81,42 +83,48 @@ target_fn, const std::vector<std::vector<double> >& args ) const
     }
     f1 = target_fn( t1 );
     // simplex conditions
+    STEP step = UNKN;
     if ( !clipper::Util::is_nan( f1 ) ) { // new point is valid
       if ( f1 < fn[iw] ) {    // new point is better than worst
         if ( f1 < fn[ib] ) {  // new point is better than best
           f2 = target_fn( t2 );
           if ( !clipper::Util::is_nan( f2 ) ) {
             if ( f2 < f1 ) {  // extended step is best
-              params[iw] = t2; fn[iw] = f2;         // extended step
+              step = EXTN;
             } else {  // normal step better than extended step
-              params[iw] = t1; fn[iw] = f1;         // normal step
+              step = NRML;
             }
           } else {  // extended step is invalid
-            params[iw] = t1; fn[iw] = f1;           // normal step
+            step = NRML;
           }
         } else {  // normal step is neither best nor worst (default)
-          params[iw] = t1; fn[iw] = f1;             // normal step
+          step = NRML;
         }
-      } else {  // normal step is worse
-	f0 = target_fn( t0 );  // contraction
-	if ( f0 < fn[iw] ) {   // contraction is better than worst
-	  params[iw] = t0; fn[iw] = f0;
-	} else {               // otherwise contract all towards best
-	  for ( int i = 0; i < params.size(); i++ )
-	    if ( i != ib ) {
-	      for ( int j = 0; j < size; j++ )
-		params[i][j] = 0.5 * ( params[i][j] + params[ib][j] );
-	      fn[i] = target_fn( params[i] );
-	    }
-        }
+      }  // else normal step is worse
+    }  // else normal step is invalid
+    if ( step == UNKN ) {    // normal step is worse or invalid
+      f0 = target_fn( t0 );  // contraction step (always valid)
+      if ( f0 < fn[iw] ) {   // contraction step is better than worst
+	step = CTRN;
+      } else {               // contraction step is worse
+	step = CTRX;
       }
-    } else {  // normal step is invalid
-      params[iw] = t0; fn[iw] = target_fn( t0 );    // contraction
+    }
+    if      ( step == EXTN ) { params[iw] = t2; fn[iw] = f2; }  // extension
+    else if ( step == NRML ) { params[iw] = t1; fn[iw] = f1; }  // normal
+    else if ( step == CTRN ) { params[iw] = t0; fn[iw] = f0; }  // contraction
+    else {  // otherwise contract all towards best (slow)
+      for ( int i = 0; i < params.size(); i++ )
+	if ( i != ib ) {
+	  for ( int j = 0; j < size; j++ )
+	    params[i][j] = 0.5 * ( params[i][j] + params[ib][j] );
+	  fn[i] = target_fn( params[i] );
+	}
     }
     if ( debug_mode )  // DEBUG OUTPUT
-      if      ( fn[iw] == f2 ) std::cout << "Extn-step\n";
-      else if ( fn[iw] == f1 ) std::cout << "Nrml-step\n";
-      else if ( fn[iw] == f0 ) std::cout << "Ctrn-step\n";
+      if      ( step == EXTN ) std::cout << "Extn-step\n";
+      else if ( step == NRML ) std::cout << "Nrml-step\n";
+      else if ( step == CTRN ) std::cout << "Ctrn-step\n";
       else                     std::cout << "Ctrx-step\n";
   }
   return params[ib];

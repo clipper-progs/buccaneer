@@ -265,6 +265,39 @@ clipper::String LLK_map_target::format() const
   return result;
 }
 
+
+void LLK_map_target::prep_llk_distribution( const clipper::Xmap<float>& xmap )
+{
+  const int ndist = 5000;
+  llkdist.resize( ndist );
+  // Magic ints, m3 = 2*m1-1, diffs are 13, 8 from Fibonacci, m1^3 ~ 10K 
+  const double m1(22.0), m2(35.0), m3(43.0); // useful up to 10K samples
+  const double twopi = clipper::Util::twopi();
+  for ( int i = 0; i < ndist; i++ ) {
+    const double x = double(i)/double(ndist);
+    const double x1 = clipper::Util::mod( m1*x, 1.0 );
+    const double x2 = clipper::Util::mod( m2*x, 1.0 );
+    const double x3 = clipper::Util::mod( m3*x, 1.0 );
+    const clipper::Euler_ccp4 rot( twopi*x1, twopi*x2, twopi*x3 );
+    const clipper::Rotation   ro( rot );
+    const clipper::Coord_frac cf( x1, x2, x3 );
+    const clipper::Coord_orth trn( cf.coord_orth( xmap.cell() ) );
+    const clipper::RTop_orth rtop( ro.matrix(), trn );
+    llkdist[i] = llk( xmap, rtop );
+  }
+  std::sort( llkdist.begin(), llkdist.end() );
+}
+
+
+clipper::ftype LLK_map_target::llk_distribution( const clipper::ftype& ordinal ) const
+{
+  if ( llkdist.size() == 0 ) return clipper::Util::nan();
+  const int i = clipper::Util::intf( ordinal*double(llkdist.size()) + 0.001 );
+  const int j = clipper::Util::bound( 0, i, int(llkdist.size()-1) );
+  return llkdist[j];
+}
+
+
 void LLK_map_target::Sampled::insert( clipper::Coord_orth coord, clipper::ftype tgt, clipper::ftype wgt ) {
   repxyz.push_back( coord );
   reptgt.push_back( tgt );

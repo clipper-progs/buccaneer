@@ -119,12 +119,23 @@ class LLK_map_target {
     LLK_map_target::TYPE type_;
   };
 
+  //! generate a distribution of LLK values for a given map
+  void prep_llk_distribution( const clipper::Xmap<float>& xmap );
+  //! return llk value by position in cumulative distribution
+  clipper::ftype llk_distribution( const clipper::ftype& ordinal ) const;
+
   //! access to fine sampled target function
   const Sampled& sampled() const { return slowtgt; }
+  //! access to LLK target for load/save
+  const clipper::NXmap<float>& llk_target() const { return target; }
+  //! access to LLK weight for load/save
+  const clipper::NXmap<float>& llk_weight() const { return weight; }
   //! access to LLK target for load/save
   clipper::NXmap<float>& llk_target() { return target; }
   //! access to LLK weight for load/save
   clipper::NXmap<float>& llk_weight() { return weight; }
+  //! access to number of samples for load/save
+  int& num_samples() { return naccum; }
  private:
   clipper::ftype radius;  //!< density sphere radius
   int naccum;             //!< number of maps accumulated
@@ -133,6 +144,7 @@ class LLK_map_target {
   Sampled slowtgt, fasttgt;
   LLK_map_target::TYPE type_;
   double tgt_off, tgt_scl;
+  std::vector<clipper::ftype> llkdist;  //!< distrn of llk vals for given xmap
 };
 
 

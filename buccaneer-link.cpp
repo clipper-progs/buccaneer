@@ -8,61 +8,88 @@
 #include <algorithm>
 
 
-bool Ca_link::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget )
+bool Ca_link::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget )
 {
-  mol2 = mol1;
+  const clipper::Spacegroup& spgr = xmap.spacegroup();
+  const clipper::Cell&       cell = xmap.cell();
 
   // establish map statistics to determine stopping value for building
-  std::vector<double> scr;
-  for ( int i = 0; i < 5000; i++ ) {
-    double r = double(i);
-    clipper::Euler_ccp4 rot( 2.0*r, 3.0*r, 5.0*r );
-    clipper::Rotation ro( rot );
-      clipper::Coord_grid cg( 23*i, 29*i, 31*i );
-      clipper::Coord_orth trn =
-	cg.coord_frac( xmap.grid_sampling() ).coord_orth( xmap.cell() );
-      clipper::RTop_orth rtop( ro.matrix(), trn );
-      double s = llktarget.llk( xmap, rtop );
-      scr.push_back( s );
-  }
-  std::sort( scr.begin(), scr.end() );
-  double cutoff = scr[25];  // select score for top 0.5% of cases
+  double cutoff = llktarget.llk_distribution( 0.005 );
 
   // now do some rebuilding
+  clipper::Coord_frac cf1, cf2;
   num_link = 0;
-  bool cont;
-  do {
-    // search over possible chains and find short links:
-    std::vector<std::pair<double, std::pair<int,int> > > links;
-    for ( int chnn = 0; chnn < mol2.size(); chnn++ )
-      for ( int chnc = 0; chnc < mol2.size(); chnc++ ) 
-	if ( chnn != chnc && mol2[chnn].size() > 3 && mol2[chnc].size() > 3 ) {
-	  int m = mol2[chnc].size()-1;
-	  int in = mol2[chnn][0].lookup( " CA ", clipper::MM::ANY );
-	  int ic = mol2[chnc][m].lookup( " CA ", clipper::MM::ANY );
-	  double d2 = ( mol2[chnc][m][ic].coord_orth() -
-			mol2[chnn][0][in].coord_orth() ).lengthsq();
-	  if ( d2 < rlink*rlink ) links.push_back( std::pair<double,std::pair<int,int> >( d2, std::pair<int,int>( chnn, chnc ) ) );
+
+  // tag the terminal residues
+  for ( int c = 0; c < mol.size(); c++ ) {
+    int m = mol[c].size()-1;
+    clipper::Property<int> p(c);
+    mol[c][0].set_property( "CHNID", p );
+    mol[c][m].set_property( "CHNID", p );
+  }
+
+  // search over possible chains and find short links:
+  std::vector<std::pair<double, std::pair<int,int> > > links;
+  for ( int chnn = 0; chnn < mol.size(); chnn++ )
+    for ( int chnc = 0; chnc < mol.size(); chnc++ ) 
+      if ( chnn != chnc && mol[chnn].size() > 3 && mol[chnc].size() > 3 ) {
+	int m = mol[chnc].size()-1;
+	int in = mol[chnn][0].lookup( " CA ", clipper::MM::ANY );
+	int ic = mol[chnc][m].lookup( " CA ", clipper::MM::ANY );
+	cf1 = mol[chnn][0][in].coord_orth().coord_frac(cell);
+	cf2 = mol[chnc][m][ic].coord_orth().coord_frac(cell);
+	cf1 = cf1.symmetry_copy_near( spgr, cell, cf2 );
+	double d2 = (cf1-cf2).lengthsq(cell);
+	if ( d2 < rlink*rlink ) links.push_back( std::pair<double,std::pair<int,int> >( d2, std::pair<int,int>( chnn, chnc ) ) );
+      }
+
+  // sort the links by length
+  std::sort( links.begin(), links.end() );
+
+  // now try each link in turn and see if it can be rebuilt
+  for ( int i = 0; i < links.size(); i++ ) {
+    int chnidn = links[i].second.first;
+    int chnidc = links[i].second.second;
+    int chnn, chnc;
+    chnn = chnc = -1;
+    for ( int c = 0; c < mol.size(); c++ ) {
+      int m = mol[c].size()-1;
+      if ( mol[c][0].exists_property("CHNID") )
+	if ( static_cast<const clipper::Property<int>&>(mol[c][0].get_property("CHNID")).value() == chnidn ) chnn = c;
+      if ( mol[c][m].exists_property("CHNID") )
+	if ( static_cast<const clipper::Property<int>&>(mol[c][m].get_property("CHNID")).value() == chnidc ) chnc = c;
+    }
+    if ( chnn >= 0 && chnc >= 0 && chnn != chnc ) {
+      // transform second chain to match first
+      int m = mol[chnc].size()-1;
+      int in = mol[chnn][0].lookup( " CA ", clipper::MM::ANY );
+      int ic = mol[chnc][m].lookup( " CA ", clipper::MM::ANY );
+      cf1 = mol[chnn][0][in].coord_orth().coord_frac(cell);
+      cf2 = mol[chnc][m][ic].coord_orth().coord_frac(cell);
+      double d2min = 1.0e9;
+      clipper::RTop_orth rto( clipper::RTop_orth::identity() );
+      for ( int s = 0; s < spgr.num_symops(); s++ ) {
+	clipper::Coord_frac cf1s = spgr.symop(s) * cf1;
+	clipper::Coord_frac cf1o = cf1s.lattice_copy_near( cf2 );
+	double d2 = (cf1o-cf2).lengthsq(cell);
+	if ( d2 < d2min ) {
+	  d2min = d2;
+	  clipper::RTop_frac rtf( spgr.symop(s).rot(),
+				  spgr.symop(s).trn() + cf1o - cf1s );
+	  rto = rtf.rtop_orth(cell);
 	}
-
-    // sort the links by length
-    std::sort( links.begin(), links.end() );
-
-    // now try each link in turn and see if it can be rebuilt
-    cont = false;
-    for ( int i = 0; i < links.size(); i++ ) {
-      //std::cout << "Trying to link " << i << " of " << links.size() << "\t" << links[i].first << "\t" << links[i].second.first << "\t" << links[i].second.second << "\n";
-      int chnn = links[i].second.first;
-      int chnc = links[i].second.second;
-      const clipper::MPolymer& mpn = mol2[chnn];
-      const clipper::MPolymer& mpc = mol2[chnc];
+      }
+      clipper::MPolymer        mpn = mol[chnn];
+      const clipper::MPolymer& mpc = mol[chnc];
+      mpn.transform( rto );
+      // try to rebuild
       int resnbest = -1;
       int rescbest = -1;
       double scrbest = 1.0e12;
       ProteinLoop::CoordList<8> r8best;
       for ( int resc = mpc.size()-2; resc < mpc.size(); resc++ )
 	for ( int resn = 0; resn < 2; resn++ ) 
-	  if ( resc > 1 && resn < mol2[resn].size() - 1 ) {
+	  if ( resc > 1 && resn < mol[resn].size() - 1 ) {
 	    int index_cc0 = mpc[resc-1].lookup( " C  ", clipper::MM::ANY );
 	    int index_cn1 = mpc[resc  ].lookup( " N  ", clipper::MM::ANY );
 	    int index_ca1 = mpc[resc  ].lookup( " CA ", clipper::MM::ANY );
@@ -82,15 +109,16 @@ bool Ca_link::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1,
 				     mpn[resn+1][index_cn5].coord_orth() );
 	      for ( int i = 0; i < r8.size(); i++ ) {
 		Ca_group ca1( r8[i][1], r8[i][2], r8[i][3] );
-		Ca_group ca2( r8[i][4], r8[i][5], r8[i][6] );
-		double scr = 0.5 * (
-		  llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
-		  llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
-		if ( scr < scrbest ) {
-		  scrbest = scr;
-		  r8best = r8[i];
-		  resnbest = resn;
-		  rescbest = resc;
+		double s1 = llktarget.llk( xmap, ca1.rtop_from_std_ori() );
+		if ( s1 < scrbest ) {
+		  Ca_group ca2( r8[i][4], r8[i][5], r8[i][6] );
+		  double s2 = llktarget.llk( xmap, ca2.rtop_from_std_ori() );
+		  if ( s2 < scrbest ) {
+		    scrbest = clipper::Util::max( s1, s2 );
+		    r8best = r8[i];
+		    resnbest = resn;
+		    rescbest = resc;
+		  }
 		}
 	      }
 	    }
@@ -137,19 +165,22 @@ bool Ca_link::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1,
 	// store the first chain and delete the second
 	int chnlo = ( chnn < chnc ) ? chnn : chnc ;
 	int chnhi = ( chnn < chnc ) ? chnc : chnn ;
-	clipper::MiniMol moltmp( mol2.spacegroup(), mol2.cell() );
-	for ( int c = 0; c < mol2.size(); c++ )
+	clipper::MiniMol moltmp( mol.spacegroup(), mol.cell() );
+	for ( int c = 0; c < mol.size(); c++ )
 	  if      ( c == chnlo ) moltmp.insert( mp );
-	  else if ( c != chnhi ) moltmp.insert( mol2[c] );
-	mol2 = moltmp;
+	  else if ( c != chnhi ) moltmp.insert( mol[c] );
+	mol = moltmp;
 	// and go back for another chain
 	num_link++;
-	cont = true;
-	break;
       } // if we build a new join
-    } // loop over possible joins
-  } while ( cont );
+    } // if we found the chains to join 
+  } // loop over possible joins
 
+  // untag the terminal residues
+  for ( int c = 0; c < mol.size(); c++ )
+    for ( int r = 0; r < mol[c].size(); r++ )
+      if ( mol[c][r].exists_property( "CHNID" ) )
+	mol[c][r].delete_property( "CHNID" );
 
   return true;
 }

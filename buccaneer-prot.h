@@ -7,6 +7,7 @@
 
 #include "buccaneer-lib.h"
 
+#include <clipper/clipper-contrib.h>
 #include <clipper/clipper-minimol.h>
 
 #include <deque>
@@ -23,6 +24,9 @@ class Ca_group {
   Ca_group() {}  //!< null constructor
   //! constructor: from atom coordinates
   Ca_group( const clipper::Coord_orth& n, const clipper::Coord_orth& ca, const clipper::Coord_orth& c ) : coord_n_(n), coord_ca_(ca), coord_c_(c) {}
+  //! constructor: from monomer
+  Ca_group( const clipper::MMonomer& mm );
+  bool is_null() const { return coord_ca_.is_null(); }
   //! get N atom coordinate
   const clipper::Coord_orth& coord_n()  const { return coord_n_; }
   //! get C-alpha atom coordinate
@@ -41,13 +45,14 @@ class Ca_group {
   //! generate previous Ca_group using Ramachandran angles
   Ca_group prev_ca_group( const clipper::ftype& phi, const clipper::ftype& psi ) const;
   static clipper::Coord_orth std_coord_ca()
-    { return clipper::Coord_orth( 0.00, 0.00, 0.00 ); }  //!< std C-a
+    { return clipper::Coord_orth( 0.0000, 0.0000, 0.0000 ); }  //!< std C-a
   static clipper::Coord_orth std_coord_c()
-    { return clipper::Coord_orth( 0.87, 0.00, 1.23 ); }  //!< std N
+    { return clipper::Coord_orth( 0.8775, 0.0000, 1.2530 ); }  //!< std C
   static clipper::Coord_orth std_coord_n()
-    { return clipper::Coord_orth( 0.83, 0.00, -1.18 ); }  //!< std C
+    { return clipper::Coord_orth( 0.8431, 0.0000,-1.2040 ); }  //!< std N
   static clipper::Coord_orth std_coord_cb()
     { return clipper::Coord_orth( -1.03, -1.11, 0.00 ); }  //!< std C-b
+  static Ca_group null() { clipper::Coord_orth n(clipper::Coord_orth::null()); return Ca_group(n,n,n); }
  private:
   clipper::Coord_orth coord_n_, coord_ca_, coord_c_;
 };
@@ -135,6 +140,11 @@ class ProteinLoop {
 //! Usefull tools for manipulating proteins
 class ProteinTools {
  public:
+  ProteinTools();
+  static int residue_index( char c )           { return rindex [int(c)]; }
+  static int residue_index_translate( char c ) { return rindext[int(c)]; }
+  static int residue_index_1( clipper::String code, bool translate=true );
+  static int residue_index_3( clipper::String code, bool translate=true );
   static int residue_index( clipper::String code, bool translate=true );
   static clipper::String residue_code_1( int index );
   static clipper::String residue_code_3( int index );
@@ -143,14 +153,23 @@ class ProteinTools {
   static clipper::String chain_sequence( const clipper::MPolymer& mp );
   static std::pair<int,int> chain_sequence_match( const clipper::String& chnseq, const clipper::MMoleculeSequence& seq );
   static bool chain_renumber( clipper::MPolymer& pol, const clipper::MMoleculeSequence& seq );
-  static bool chain_tidy( clipper::MiniMol& target, const clipper::MiniMol& source );
+  static clipper::RTop_orth superpose( const clipper::MPolymer& mp1, const clipper::MPolymer& mp2, const double& rmsd, const int& nmatch, const int& nmismatch );
+  static bool chain_tidy( clipper::MiniMol& mol );
   static bool copy_residue_types( clipper::MiniMol& target, const clipper::MiniMol& source );
   static bool globularise( clipper::MiniMol& mol, const clipper::Coord_frac cent );
   static bool globularise( clipper::MiniMol& mol );
+  static bool symm_match( clipper::MiniMol& molwrk, const clipper::MiniMol& molref );
+  static std::vector<float> main_chain_densities( const clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, int nsmooth=0 );
+  static bool break_chains( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap );
  private:
+  class MapFilterFn_g5 : public clipper::MapFilterFn_base { public:
+    clipper::ftype operator() ( const clipper::ftype& radius ) const { return exp(-radius*radius/50.0); }
+  };
   static const int ntype;
   static const char rtype1[21];
   static const char rtype3[21][4];
+  static const int  tindex[21];
+  static int rindex[256], rindext[256];
 };
 
 

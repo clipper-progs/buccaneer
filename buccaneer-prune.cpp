@@ -7,17 +7,17 @@
 
 
 
-bool Ca_prune::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 ) const
+bool Ca_prune::operator() ( clipper::MiniMol& mol ) const
 {
   typedef clipper::MMonomer Mm;
   clipper::ftype r2cut = rad_*rad_;
 
-  clipper::Cell       cell = mol1.cell();
-  clipper::Spacegroup spgr = mol1.spacegroup();
+  clipper::Cell       cell = mol.cell();
+  clipper::Spacegroup spgr = mol.spacegroup();
 
   // split into separate chains
-  clipper::MiniMol moltmp;
-  ProteinTools::chain_tidy( moltmp, mol1 );
+  clipper::MiniMol moltmp = mol;
+  ProteinTools::chain_tidy( moltmp );
 
   // now loop over chains
   clipper::Coord_frac cf1, cf2;
@@ -53,7 +53,7 @@ bool Ca_prune::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1
   }
 
   // eliminate any sequences of less than 6 residues
-  mol2 = clipper::MiniMol( spgr, cell );
+  mol = clipper::MiniMol( spgr, cell );
   clipper::MPolymer mp, mpnull;
   for ( int chn = 0; chn < moltmp.size(); chn++ ) {
     mp = mpnull;
@@ -61,11 +61,11 @@ bool Ca_prune::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1
       if ( moltmp[chn][res].type() != "~~~" ) {
 	mp.insert( moltmp[chn][res] );
       } else {
-	if ( mp.size() > 5 ) mol2.insert( mp );
+	if ( mp.size() > 5 ) mol.insert( mp );
 	mp = mpnull;
       }
     }
-    if ( mp.size() > 5 ) mol2.insert( mp );
+    if ( mp.size() > 5 ) mol.insert( mp );
   }
 
   return true;

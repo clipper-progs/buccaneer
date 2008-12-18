@@ -6,35 +6,35 @@
 #include <clipper/clipper-contrib.h>
 
 
-double Ca_correct::score_chain_sequence( const clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget )
+double Ca_correct::score_chain_position( const clipper::MMonomer& mm, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget )
 {
   double z = 0.0;
-  for ( int r = 0; r < mp.size(); r++ ) {
-    // get residue type
-    int t = ProteinTools::residue_index( mp[r].type() );
-    // and score if recongnized
-    if ( t >= 0 && t < llktarget.size() ) {
-      // find ca, c, n
-      int index_n  = mp[r].lookup( " N  ", clipper::MM::ANY );
-      int index_ca = mp[r].lookup( " CA ", clipper::MM::ANY );
-      int index_c  = mp[r].lookup( " C  ", clipper::MM::ANY );
-      // if we have all three atoms, then score it
-      if ( index_ca >= 0 && index_c >= 0 && index_n >= 0 ) {
-	Ca_group ca( mp[r][index_n ].coord_orth(), mp[r][index_ca].coord_orth(),
-		     mp[r][index_c ].coord_orth() );
-        z += llktarget[t].llk( xmap, ca.rtop_beta_carbon() );
-      }
-    }
+  // get residue type
+  int t = ProteinTools::residue_index_3( mm.type() );
+  // and score if recongnized
+  if ( t >= 0 && t < llktarget.size() ) {
+    Ca_group ca( mm );
+    if ( !ca.is_null() )
+      z = llktarget[t].llk( xmap, ca.rtop_beta_carbon() );
   }
   return z;
 }
 
 
-/* position is the index of the first Ca to move - the preceding C moves also */
-std::pair<double,clipper::MPolymer> Ca_correct::best_rebuild_sequence( const int& position, const clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget )
+double Ca_correct::score_chain_sequence( const clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget )
 {
-  std::pair<double,clipper::MPolymer> best;
-  best.first = 1.0e12;
+  double z = 0.0;
+  for ( int r = 0; r < mp.size(); r++ )
+    z += score_chain_position( mp[r], xmap, llktarget );
+  return z;
+}
+
+
+/* position is the index of the first Ca to move - the preceding C moves also */
+clipper::MPolymer Ca_correct::best_rebuild_sequence( const int& position, const clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget )
+{
+  double bestz = 1.0e12;
+  clipper::MPolymer bestp;
   // find the atoms to rebuild
   int index_cc0 = mp[position-2].lookup( " C  ", clipper::MM::ANY );
   int index_cn1 = mp[position-1].lookup( " N  ", clipper::MM::ANY );
@@ -78,32 +78,36 @@ std::pair<double,clipper::MPolymer> Ca_correct::best_rebuild_sequence( const int
       mp1[position+1][index_cc3].set_coord_orth( r8[i][6] );
       mp1[position+2][index_cn4].set_coord_orth( r8[i][7] );
       // score the chain
-      double z = score_chain_sequence( mp1, xmap, llktarget );
+      double z = 
+	score_chain_position( mp1[position-1], xmap, llktarget ) +
+	score_chain_position( mp1[position  ], xmap, llktarget ) +
+	score_chain_position( mp1[position+1], xmap, llktarget ) +
+	score_chain_position( mp1[position+2], xmap, llktarget );
       // if this chain is best, then update
-      if ( z < best.first ) {
-	best.first  = z;
-	best.second = mp1;
+      if ( z < bestz ) {
+	bestz = z;
+	bestp = mp1;
       }
     }  // done loop over fitted loops
   }  // if
-  return best;
+  return bestp;
 }
 
 
-bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq )
+bool Ca_correct::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq )
 {
   typedef clipper::MMonomer Mm;
 
   // split into separate chains
-  ProteinTools::chain_tidy( mol2, mol1 );
+  ProteinTools::chain_tidy( mol );
 
   num_cor = 0;
 
   // now loop over chains
   int last_pos;
-  for ( int chn = 0; chn < mol2.size(); chn++ ) {
+  for ( int chn = 0; chn < mol.size(); chn++ ) {
     // extract the sequence of this chain
-    clipper::MPolymer mpwrk = mol2[chn];
+    clipper::MPolymer mpwrk = mol[chn];
     clipper::String seq0 = ProteinTools::chain_sequence( mpwrk );
 
     const int offset  = 8;    // how far to search for insertion/deletion
@@ -145,12 +149,14 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
 	for ( int r = ins2; r < len; r++ )
 	  mp[r-nins].set_type( mpwrk[r].type() );
 	// rebuild and score
-	std::pair<double,clipper::MPolymer> result =
-	  best_rebuild_sequence( rl, mp, xmap, llktarget );
-	double z = result.first - znull;
-	if ( z < zbest ) {
-	  zbest = z;
-	  mpbest = result.second;
+        clipper::MPolymer result =
+          best_rebuild_sequence( rl, mp, xmap, llktarget );
+	if ( result.size() > 0 ) {
+	  double z = score_chain_sequence( result, xmap, llktarget ) - znull;
+	  if ( z < zbest ) {
+	    zbest = z;
+	    mpbest = result;
+	  }
 	}
       }  // done loop over fitting positions
       // store the sequence
@@ -217,20 +223,22 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
 	for ( int r = 0; r < del1; r++ )
 	  mp[r].set_type( mpwrk[r].type() );
 	for ( int r = del1; r < del2+ndel; r++ ) {
-	  int t = ProteinTools::residue_index( seqx.substr(r-del1,1) );
+	  int t = ProteinTools::residue_index_translate( seqx[r-del1] );
 	  if ( t >= 0 ) mp[r].set_type( ProteinTools::residue_code_3( t ) );
 	  else          mp[r].set_type( "UNK" );
 	}
 	for ( int r = del2; r < len; r++ )
 	  mp[r+ndel].set_type( mpwrk[r].type() );
 	// rebuild and score
-	std::pair<double,clipper::MPolymer> result =
-	  best_rebuild_sequence( rl, mp, xmap, llktarget );
-	double z = result.first - znull;
-	if ( z < zbest ) {
-	  zbest = z;
-	  mpbest = result.second;
-	}
+        clipper::MPolymer result =
+          best_rebuild_sequence( rl, mp, xmap, llktarget );
+	if ( result.size() > 0 ) {
+	  double z = score_chain_sequence( result, xmap, llktarget ) - znull;
+	  if ( z < zbest ) {
+	    zbest = z;
+	    mpbest = result;
+	  }
+        }
       }  // done loop over fitting positions
       // store the sequence
       if ( zbest < 0.0 ) {
@@ -246,7 +254,7 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mo
     }  // done deletion correction
 
     // store the chain again
-    mol2[chn] = mpwrk;
+    mol[chn] = mpwrk;
   }  // next chain
 
   return true;

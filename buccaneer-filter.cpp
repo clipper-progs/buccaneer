@@ -8,22 +8,9 @@
 #include <algorithm>
 
 
-std::vector<double> smooth( const std::vector<double>& x )
+bool Ca_filter::filter( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, double sigcut )
 {
-  int n = x.size();
-  std::vector<double> result( n );
-  result[ 0 ] = 0.25*( 3.0*x[0] + x[1] );
-  for ( int i = 1; i < n-1; i++ )
-    result[i] = 0.25*( x[i-1] + 2.0*x[i] + x[i+1] );
-  result[n-1] = 0.25*( x[n-2] + 3.0*x[n-1] );
-  return result;
-}
-
-
-bool Ca_filter::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1, const clipper::Xmap<float>& xmap )
-{
-  clipper::Cell       cell = xmap.cell();
-  clipper::Spacegroup spgr = xmap.spacegroup();
+  clipper::MiniMol mol1 = mol;
 
   // determine sigma cutoff based on map
   clipper::Map_stats stats( xmap );
@@ -31,74 +18,27 @@ bool Ca_filter::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol
   double s2 = stats.std_dev();
 
   // now apply it a chain at a time
-  std::vector<int> atms;
-  clipper::MiniMol moltmp = mol1;
-  for ( int chn = 0; chn < moltmp.size(); chn++ ) {
+  for ( int chn = 0; chn < mol1.size(); chn++ ) {
     // score the residues
-    std::vector<double> scores( moltmp[chn].size(), 0.0 );
-    for ( int res = 0; res < moltmp[chn].size(); res++ ) {
-      atms.clear();
-      atms.push_back( moltmp[chn][res].lookup( " N  ", clipper::MM::ANY ) );
-      atms.push_back( moltmp[chn][res].lookup( " CA ", clipper::MM::ANY ) );
-      atms.push_back( moltmp[chn][res].lookup( " C  ", clipper::MM::ANY ) );
-      double t0, t1;
-      t0 = t1 = 0.0;
-      for ( int i = 0; i < atms.size(); i++ ) {
-	int atm = atms[i];
-	clipper::Coord_orth co = moltmp[chn][res][atm].coord_orth();
-	clipper::Coord_frac cf = co.coord_frac( xmap.cell() );
-	double r = xmap.interp<clipper::Interp_cubic>( cf );
-	t0 += 1.0;
-	t1 += r;
-      }
-      if ( t0 > 0.5 ) t1 /= t0;
-      scores[res] = ( t1 - s1 ) / s2;
-    }
-    // smooth
-    for ( int i = 0; i < 5; i++ ) scores = smooth( scores );
-
-    // mark residues in sequence breaks
-    int res = 0;
-    while( res < moltmp[chn].size() ) {
-      if ( moltmp[chn][res].type() != "UNK" ) break;
-      res++;
-    }
-    while( res < moltmp[chn].size() ) {
-      while( res < moltmp[chn].size() ) {
-	if ( moltmp[chn][res].type() == "UNK" ) break;
-	res++;
-      }
-      int res0 = res;
-      while( res < moltmp[chn].size() ) {
-	if ( moltmp[chn][res].type() != "UNK" ) break;
-	res++;
-      }
-      int res1 = res;
-      if ( res1 < moltmp[chn].size() ) {
-	int resm = res0;  // find the weakest residues to delete
-	for ( int r = res0; r < res1; r++ )
-	  if ( scores[r] < scores[resm] ) resm = r;
-	moltmp[chn][resm].set_type( "~~~" );
-	if ( resm-1 >= res0 ) moltmp[chn][resm-1].set_type( "~~~" );
-	if ( resm+1 <  res1 ) moltmp[chn][resm+1].set_type( "~~~" );
-      }
-    }
+    std::vector<float> scores =
+      ProteinTools::main_chain_densities( mol1[chn], xmap, 5 );
+    for ( int res = 0; res < scores.size(); res++ )
+      scores[res] = ( scores[res] - s1 ) / s2;
 
     // mark residues in poor density
-    for ( int res = 0; res < moltmp[chn].size(); res++ )
-      if ( moltmp[chn][res].type() == "UNK" && scores[res] <= sigcut )
-	moltmp[chn][res].set_type( "~~~" );
-
+    for ( int res = 0; res < mol1[chn].size(); res++ )
+      if ( mol1[chn][res].type() == "UNK" && scores[res] <= sigcut )
+	mol1[chn][res].set_type( "~~~" );
   }
 
   // eliminate any sequences of less than 6 residues
-  mol2 = clipper::MiniMol( spgr, cell );
+  clipper::MiniMol mol2( mol1.spacegroup(), mol1.cell() );
   clipper::MPolymer mp, mpnull;
-  for ( int chn = 0; chn < moltmp.size(); chn++ ) {
+  for ( int chn = 0; chn < mol1.size(); chn++ ) {
     mp = mpnull;
-    for ( int res = 0; res < moltmp[chn].size(); res++ ) {
-      if ( moltmp[chn][res].type() != "~~~" ) {
-	mp.insert( moltmp[chn][res] );
+    for ( int res = 0; res < mol1[chn].size(); res++ ) {
+      if ( mol1[chn][res].type() != "~~~" ) {
+	mp.insert( mol1[chn][res] );
       } else {
 	if ( mp.size() > 5 ) mol2.insert( mp );
 	mp = mpnull;
@@ -107,5 +47,12 @@ bool Ca_filter::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol
     if ( mp.size() > 5 ) mol2.insert( mp );
   }
 
+  mol = mol2;
   return true;
+}
+
+
+bool Ca_filter::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap ) const
+{
+  return filter( mol, xmap, sigcut );
 }

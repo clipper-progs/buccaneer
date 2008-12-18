@@ -9,9 +9,8 @@
 class Ca_ncsbuild {
  public:
   Ca_ncsbuild( double reliability = 0.5, double rmsd = 1.0, int nmin = 12 ) : reliability_(reliability), rmsd_(rmsd), nmin_(nmin) {}
-  bool operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq ) const;
+  bool operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq ) const;
  private:
-  clipper::RTop_orth superpose( const clipper::MPolymer& mp1, const clipper::MPolymer& mp2 ) const;
   double reliability_, rmsd_;
   int nmin_;
 };

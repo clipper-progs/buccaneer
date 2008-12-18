@@ -1,5 +1,5 @@
 /*! \file buccaneer-join.cpp buccaneer library */
-/* (C) 2006 Kevin Cowtan & University of York all rights reserved */
+/* (C) 2006-2008 Kevin Cowtan & University of York all rights reserved */
 
 #include "buccaneer-join.h"
 
@@ -9,7 +9,7 @@
 
 struct Tri_residue {
   int flag;
-  clipper::ftype score;
+  double score;
   clipper::String type[3];
   clipper::Coord_orth res[3][3];
 };
@@ -76,39 +76,17 @@ std::vector<int> Ca_join::longest_chain( std::vector<std::vector<int> >& fwd_ptr
 }
 
 
-// build chains by merging and joining tri-residue fragments
-bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 ) const
+bool Ca_join::join( clipper::MiniMol& mol, const double& rmerg, const double& rjoin, const clipper::Coord_orth& com )
 {
   typedef clipper::MMonomer Mm;
-  clipper::ftype r2merg = rmerg*rmerg;
-  clipper::ftype r2join = rjoin*rjoin;
+  double r2merg = rmerg*rmerg;
+  double r2join = rjoin*rjoin;
 
-  clipper::Cell       cell = mol1.cell();
-  clipper::Spacegroup spgr = mol1.spacegroup();
+  const clipper::MiniMol& mol1 = mol;
+  const clipper::Cell       cell = mol1.cell();
+  const clipper::Spacegroup spgr = mol1.spacegroup();
 
-  // first calculate a convenient ASU centre for output of results
-  // (cosmetic only)
-  clipper::Coord_frac com;
-  {
-    // calc mask
-    clipper::Resolution reso( 2.0 );
-    clipper::Grid_sampling grid( spgr, cell, reso );
-    clipper::Xmap<float> xmap( spgr, cell, grid ), xflt( spgr, cell, grid );
-    clipper::EDcalc_mask<float> maskcalc( 2.0 );
-    maskcalc( xmap, mol1.atom_list() );
-    // calc smoothing radius
-    clipper::ftype rad = 0.5 * pow( cell.volume()/spgr.num_symops(), 0.333 );
-    clipper::MapFilterFn_linear fn( rad );
-    clipper::MapFilter_fft<float>
-      fltr( fn, 1.0, clipper::MapFilter_fft<float>::Relative );
-    fltr( xflt, xmap ); 
-    // find peak
-    typedef clipper::Xmap<float>::Map_reference_index MRI;
-    MRI iy = xflt.first();
-    for ( MRI ix = xflt.first(); !ix.last(); ix.next() )
-      if ( xflt[ix] > xflt[iy] ) iy = ix;
-    com = iy.coord().coord_frac( grid );
-  }
+  clipper::Coord_frac comf = com.coord_frac(cell);
 
   // create 3-residue segments
   std::vector<Tri_residue> fragments;
@@ -176,8 +154,8 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
 	if ( ( cy0 - cx0 ).lengthsq(cell) < r2merg &&
 	     ( cy1 - cx1 ).lengthsq(cell) < r2merg &&
 	     ( cy2 - cx2 ).lengthsq(cell) < r2merg ) {
-	  clipper::ftype s1 = fragments[f1].score / (fragments[f1].score+1.0);
-	  clipper::ftype s2 =                 1.0 / (fragments[f1].score+1.0);
+	  double s1 = fragments[f1].score / (fragments[f1].score+1.0);
+	  double s2 =                 1.0 / (fragments[f1].score+1.0);
 	  for ( int r = 0; r < 3; r++ )
 	    for ( int a = 0; a < 3; a++ ) {
 	      cy1 = fragments[f2].res[r][a].coord_frac(cell);
@@ -269,7 +247,7 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
   char atomid[3][5] = { " N  ", " CA ", " C  " };
   char atomel[3][2] = { "N", "C", "C" };
 
-  mol2 = clipper::MiniMol( spgr, cell );
+  clipper::MiniMol mol2( spgr, cell );
   for ( int c = 0; c < chns.size(); c++ ) {
     // chain and atom info
     clipper::MPolymer chain;
@@ -281,7 +259,8 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
     const std::vector<int>& chn = chns[c];
 
     clipper::Coord_frac cx, cy;
-    cx = com;  // reference coord
+    cx = fragments[chn[0]].res[0][1].coord_frac(cell);  // reference coord
+    cx = cx.symmetry_copy_near( spgr, cell, comf );
 
     for ( int f = -1; f < int(chn.size())+1; f++ ) {
       // residue info
@@ -291,7 +270,7 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
       // add this residue
       for ( int a = 0; a < 3; a++ ) {
 	clipper::Coord_orth co( 0.0, 0.0, 0.0 );
-	clipper::ftype s = 0.0;
+	double s = 0.0;
 	for ( int r = -1; r <= 1; r++ )
 	  if ( f+r >= 0 && f+r < chn.size() ) {
 	    s += 1.0;
@@ -349,9 +328,42 @@ bool Ca_join::operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1 
   }
 
   // globularise
-  ProteinTools::globularise( mol2 );
+  ProteinTools::globularise( mol2, comf );
 
   // restore the residue types, if any
   ProteinTools::copy_residue_types( mol2, mol1 );
+
+  mol = mol2;
   return true;
+}
+
+
+// build chains by merging and joining tri-residue fragments
+bool Ca_join::operator() ( clipper::MiniMol& mol ) const
+{
+  const clipper::Cell       cell = mol.cell();
+  const clipper::Spacegroup spgr = mol.spacegroup();
+
+  // first calculate a convenient ASU centre for output of results
+  // (cosmetic only)
+  // calc mask
+  clipper::Resolution reso( 2.0 );
+  clipper::Grid_sampling grid( spgr, cell, reso, 1.0 );
+  clipper::Xmap<float> xmap( spgr, cell, grid ), xflt( spgr, cell, grid );
+  clipper::EDcalc_mask<float> maskcalc( 2.0 );
+  maskcalc( xmap, mol.atom_list() );
+  // calc smoothing radius
+  double rad = 0.5 * pow( cell.volume()/spgr.num_symops(), 0.333 );
+  clipper::MapFilterFn_linear fn( rad );
+  clipper::MapFilter_fft<float>
+    fltr( fn, 1.0, clipper::MapFilter_fft<float>::Relative );
+  fltr( xflt, xmap );
+  // find peak
+  typedef clipper::Xmap<float>::Map_reference_index MRI;
+  MRI iy = xflt.first();
+  for ( MRI ix = xflt.first(); !ix.last(); ix.next() )
+    if ( xflt[ix] > xflt[iy] ) iy = ix;
+  clipper::Coord_orth com = iy.coord_orth();
+
+  return join( mol, rmerg, rjoin, com );
 }

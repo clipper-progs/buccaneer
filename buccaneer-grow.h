@@ -12,18 +12,23 @@ class Ca_grow {
   //! constructor: take maximum number of rasidues to add in either direction
   Ca_grow( int n_grow = 25 );
   //! grow the chain given a map and target
-  bool operator() ( clipper::MiniMol& mol2, const clipper::MiniMol& mol1, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget ) const;
+  bool operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget ) const;
+
+  //! Grow a chain at both ends
+  static void grow( Ca_chain& chain, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const clipper::Ramachandran& rama1, const clipper::Ramachandran& rama2, const double& cutoff, const int& ngrow );
+  //! Add a new Ca-group to the C-terminus of a chain by best fit to density.
+  static Ca_group next_ca_group( const Ca_chain& chain, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const clipper::Ramachandran& rama1, const clipper::Ramachandran& rama2 );
+  //! Add a new Ca-group to the N-terminus of a chain by best fit to density.
+  static Ca_group prev_ca_group( const Ca_chain& chain, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const clipper::Ramachandran& rama1, const clipper::Ramachandran& rama2 );
+
+  static void set_cpus( int cpus ) { ncpu = cpus; }
  private:
   struct Rama_ang { float phi,psi; };     //!< ramachandran angles
   struct Rama_ang1 { Rama_ang r1; };
   struct Rama_ang2 { Rama_ang r1, r2; };
-  //! Add a new Ca-group to the C-terminus of a chain by best fit to density.
-  Ca_group next_ca_group( const Ca_chain& chain, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget ) const;
-  //! Add a new Ca-group to the N-terminus of a chain by best fit to density.
-  Ca_group prev_ca_group( const Ca_chain& chain, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget ) const;
   int ngrow;
-  int max_conf1, max_conf2;
-  clipper::Ramachandran rama1, rama2;  
+  static const int max_conf1, max_conf2;
+  static int ncpu;
 };
 
 
