@@ -31,7 +31,7 @@ template<class T> class Score_list {
     if ( addable( scr ) ) {
       if ( list.size() >= max )	list.pop_back();
       int i; for ( i = list.size()-1; i >= 0; i-- ) if ( scr > score(i) ) break;
-      list.insert( list.begin()+i+1, std::pair<clipper::ftype,T>(scr,data) );
+      list.insert( list.begin()+(i+1), std::pair<clipper::ftype,T>(scr,data) );
     }
   }
   //! delete a score from the list
