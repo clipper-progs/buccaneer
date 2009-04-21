@@ -333,7 +333,7 @@ bool Ca_find::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xm
 
   // do the fffear search:
   const double stepff = 24.0;
-  const double stepss = 18.0;
+  const double stepss = 24.0;
   const double dres = 5.0;
 
   // NOW DO THE SEARCH (FIRST CYCLE ONLY)
@@ -345,7 +345,7 @@ bool Ca_find::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xm
       results = search_llk( xmap, llktarget );
     } else {
       // make a list of rotation ops to try
-      ops = llktarget.rtop_list( spgr, stepss );
+      ops = llktarget.rtop_list( clipper::Spacegroup::p1(), stepss );
       // do the search
       results = search_sec( xmap, llktarget );
     }
