@@ -8,7 +8,7 @@
 #include <clipper/clipper-contrib.h>
 
 
-// Result class
+/*! Result class */
 class SearchResult {
  public:
   float score; int rot; int trn;
@@ -25,7 +25,7 @@ class Ca_find {
   static void set_cpus( int cpus ) { ncpu = cpus; }
 
  private:
-  //friend class Search_threaded;
+  friend class Search_threaded;
   // convenient analytial approximate distance funtion
   static double prob_dist( double x ) { return 0.999*exp(-75.0*pow(x-3.50,2.0)*pow(x,-2.5))+0.001; }
   // perform a single search from a list
@@ -45,29 +45,59 @@ class Ca_find {
 };
 
 
+//! class for searching for Ca groups
+class Search_threaded : public clipper::Thread_base {
+ public:
+  Search_threaded() {}
+  Search_threaded( const clipper::Xmap<int>& xlookp1, const clipper::FFFear_fft<float>& srch, const LLK_map_target& llktarget, const std::vector<clipper::RTop_orth>& ops, const int lresult );
+  void set_range( int n1, int n2 ) { n1_ = n1; n2_ = n2; }
+  void search( const int& op );
+  const std::vector<SearchResult>& results() const { return results_; }
+  //! run single or multi-threaded
+  bool operator() ( int nthread = 0 );
+  //! merge results from multiple threads
+  void merge( const Search_threaded& other );
+ private:
+  void Run();        //!< the thread 'Run' method
+  // all data required for calculation is stored in the class
+  std::vector<SearchResult> results_;
+  clipper::Xmap<float> xmap1_;
+  const clipper::Xmap<int>* xlookp1_;
+  const clipper::FFFear_fft<float>* srch_;
+  const LLK_map_target* llktarget_;
+  const std::vector<clipper::RTop_orth> ops_;
+  int n1_, n2_;
+  bool done;
+};
+
+
 //! class for fast secondary structure finding (alternative to fffear)
-class SSfind
-{
+class SSfind {
  public:
   enum SSTYPE { ALPHA2, ALPHA3, ALPHA4, BETA2, BETA3, BETA4 };
   typedef std::pair<clipper::Coord_orth,clipper::Coord_orth> Pair_coord;
 
-  void prep_xmap( const clipper::Xmap<float>& xmap, const double radius );
-  void prep_target( SSfind::SSTYPE type, int num_residues );
-  void set_target_score( const double score );
-  const std::vector<SearchResult>& search( const std::vector<clipper::RTop_orth>& ops, const double rhocut );
+  class Target {
+  public:
+    Target( SSfind::SSTYPE type, int num_residues );
+    const std::vector<Pair_coord>          target_coords() { return target_cs; }
+    const std::vector<clipper::Coord_orth> calpha_coords() { return calpha_cs; }
+  private:
+    std::vector<Pair_coord>          target_cs;
+    std::vector<clipper::Coord_orth> calpha_cs;
+  };
 
-  const std::vector<Pair_coord>          target_coords() { return target_cs; }
-  const std::vector<clipper::Coord_orth> calpha_coords() { return calpha_cs; }
-  const std::vector<SearchResult>& results() const { return rslts; }
+  void prep_xmap( const clipper::Xmap<float>& xmap, const double radius );
+  void prep_search( const clipper::Xmap<float>& xmap );
+  void prep_search( const clipper::Xmap<float>& xmap, const double rhocut, const double radcut, const clipper::Coord_orth centre );
+  std::vector<SearchResult> search( const std::vector<Pair_coord>& target_cs, const std::vector<clipper::RTop_orth>& ops, const double rhocut, const double frccut = 0.0 ) const;
+
  private:
-  std::vector<Pair_coord>          target_cs;
-  std::vector<clipper::Coord_orth> calpha_cs;
   std::vector<float> mapbox;
+  std::vector<int> srctrn;
   clipper::Grid grid;
   clipper::Grid_range mxgr;
   clipper::Mat33<> grrot;
-  std::vector<SearchResult> rslts;
 };
 
 

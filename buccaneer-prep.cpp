@@ -60,14 +60,14 @@ bool Ca_prep::operator() ( LLK_map_target& llktgt, std::vector<LLK_map_target>& 
       }
     }
 
+  /*
   for ( int t = 0; t < rtops.size(); t++ )
     for ( int r = 0; r < rtops[t].size(); r++ )
       targets[t].accumulate( xmap, rtops[t][r] );
-  /*
+  */
   Prep_threaded prep( targets, xmap, rtops );
   prep( ncpu );
   targets = prep.result();
-  */
 
   llktgt.init( main_tgt_rad_, 0.5, tgttyp );
   llkcls.resize(nside);
@@ -91,4 +91,66 @@ bool Ca_prep::operator() ( LLK_map_target& llktgt, std::vector<LLK_map_target>& 
     for ( int t = 0; t < nside; t++ ) llkcls[t].prep_llk();
 
   return true;
+}
+
+
+// thread methods
+
+int Prep_threaded::count = 0;
+
+Prep_threaded::Prep_threaded( std::vector<LLK_map_target>& targets, const clipper::Xmap<float>& xmap, const std::vector<std::vector<clipper::RTop_orth> >& rtops ) : targets_(targets), xmap_(&xmap), rtops_(rtops)
+{
+  // flag which targets were done
+  done = std::vector<bool>( rtops_.size(), false );
+
+  // init thread count
+  count = 0;
+}
+
+void Prep_threaded::prep( const int& t )
+{
+  for ( int r = 0; r < rtops_[t].size(); r++ ) {
+    targets_[t].accumulate( *xmap_, rtops_[t][r] );
+  }
+  done[t] = true;
+}
+
+bool Prep_threaded::operator() ( int nthread )
+{
+  bool thread = ( nthread > 0 );
+  // try running multi-threaded
+  if ( thread ) {
+    std::vector<Prep_threaded> threads( nthread-1, (*this) );
+    run();  for ( int i = 0; i < threads.size(); i++ ) threads[i].run();
+    join(); for ( int i = 0; i < threads.size(); i++ ) threads[i].join();
+    // check that it finished
+    if ( count >= rtops_.size() ) {
+      for ( int i = 0; i < threads.size(); i++ ) merge( threads[i] );
+    } else {
+      thread = false;
+    }
+  }
+  // else run in main thread
+  if ( !thread ) {
+    for ( int count = 0; count < rtops_.size(); count++ ) prep( count );
+  }
+  return true;
+}
+
+void Prep_threaded::merge( const Prep_threaded& other )
+{
+  for ( int count = 0; count < rtops_.size(); count++ )
+    if ( other.done[count] )
+      targets_[count] = other.targets_[count];
+}
+
+void Prep_threaded::Run()
+{
+  while (1) {
+    lock();
+    int t = count++;
+    unlock();
+    if ( t >= targets_.size() ) break;
+    prep( t );
+  }
 }

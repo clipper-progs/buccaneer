@@ -140,6 +140,7 @@ class ProteinLoop {
 //! Usefull tools for manipulating proteins
 class ProteinTools {
  public:
+  enum TYPES { PROTEIN=1, NONPROTEIN=2, SOLVENT=4, SUBSTRUCTURE=8 };
   ProteinTools();
   static int residue_index( char c )           { return rindex [int(c)]; }
   static int residue_index_translate( char c ) { return rindext[int(c)]; }
@@ -156,6 +157,7 @@ class ProteinTools {
   static clipper::RTop_orth superpose( const clipper::MPolymer& mp1, const clipper::MPolymer& mp2, const double& rmsd, const int& nmatch, const int& nmismatch );
   static bool chain_tidy( clipper::MiniMol& mol );
   static bool copy_residue_types( clipper::MiniMol& target, const clipper::MiniMol& source );
+  static bool copy_other_atoms( clipper::MiniMol& target, const clipper::MiniMol& source, unsigned int types );
   static bool globularise( clipper::MiniMol& mol, const clipper::Coord_frac cent );
   static bool globularise( clipper::MiniMol& mol );
   static bool symm_match( clipper::MiniMol& molwrk, const clipper::MiniMol& molref );

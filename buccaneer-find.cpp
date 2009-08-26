@@ -86,7 +86,7 @@ clipper::RTop_orth Target_fn_refine_llk_map_target::refine( const clipper::RTop_
 }
 
 
-void SSfind::prep_target( SSfind::SSTYPE type, int num_residues )
+SSfind::Target::Target( SSfind::SSTYPE type, int num_residues )
 {
   const int sslen = num_residues;
 
@@ -200,20 +200,9 @@ void SSfind::prep_xmap( const clipper::Xmap<float>& xmap, const double radius )
   clipper::Grid_range gr1( xmap.cell(), xmap.grid_sampling(), radius );
   mxgr = clipper::Grid_range( gr0.min()+gr1.min(), gr0.max()+gr1.max() );
   mapbox = std::vector<float>( mxgr.size(), 0.0 );
-  typedef clipper::Xmap<float>::Map_reference_index MRI;
-
-  // make list of results;
-  SearchResult rslt;
-  rslts.clear();
-  for ( MRI ix = xmap.first(); !ix.last(); ix.next() ) {
-    rslt.score = 0.0;
-    rslt.rot = -1;
-    rslt.trn = grid.index( ix.coord() );
-    rslts.push_back( rslt );
-  }
 
   // make 1d list of densities
-  MRI ix( xmap );
+  clipper::Xmap<float>::Map_reference_index ix( xmap );
   for ( int i = 0; i < mapbox.size(); i++ ) {
     ix.set_coord( mxgr.deindex( i ) );
     mapbox[i] = xmap[ix];
@@ -221,21 +210,41 @@ void SSfind::prep_xmap( const clipper::Xmap<float>& xmap, const double radius )
 }
 
 
-void SSfind::set_target_score( const double score ) {
-  for ( int i = 0; i < rslts.size(); i++ ) {
-    rslts[i].score = score;
-    rslts[i].rot = -1;
-  }
+void SSfind::prep_search( const clipper::Xmap<float>& xmap )
+{
+  // make list of results
+  typedef clipper::Xmap<float>::Map_reference_index MRI;
+  srctrn.clear();
+  for ( MRI ix = xmap.first(); !ix.last(); ix.next() )
+    srctrn.push_back( grid.index( ix.coord() ) );
 }
 
 
-const std::vector<SearchResult>& SSfind::search( const std::vector<clipper::RTop_orth>& ops, const double rhocut )
+void SSfind::prep_search( const clipper::Xmap<float>& xmap, const double rhocut, const double radcut, const clipper::Coord_orth centre )
+{
+  // make list of results
+  typedef clipper::Xmap<float>::Map_reference_index MRI;
+  srctrn.clear();
+  double r2cut = ( radcut > 0.0 ) ? radcut*radcut : 1.0e20;
+  clipper::Coord_frac cf = centre.coord_frac( xmap.cell() );
+  for ( MRI ix = xmap.first(); !ix.last(); ix.next() )
+    if ( xmap[ix] > rhocut ) {
+      clipper::Coord_frac df = ix.coord().coord_frac( xmap.grid_sampling() );
+      df = df.symmetry_copy_near( xmap.spacegroup(), xmap.cell(), cf ) - cf;
+      double r2 = df.lengthsq( xmap.cell() );
+      if ( r2 < r2cut )
+	srctrn.push_back( grid.index( ix.coord() ) );
+    }
+}
+
+
+std::vector<SearchResult> SSfind::search( const std::vector<Pair_coord>& target_cs, const std::vector<clipper::RTop_orth>& ops, const double rhocut, const double frccut ) const
 {
   // make a list of indexed, intergerized, rotated lists
   std::vector<std::vector<std::pair<int,int> > > index_lists;
   int i0 = mxgr.index( clipper::Coord_grid(0,0,0) );
   for ( int r = 0; r < ops.size(); r++ ) {
-    clipper::RTop_orth op = ops[r].inverse();
+    clipper::RTop_orth op = ops[r];
     std::vector<std::pair<int,int> > tmp;
     for ( int i = 0; i < target_cs.size(); i++ ) {
       const clipper::Coord_map c1( grrot*(op*target_cs[i].first  ) );
@@ -246,10 +255,18 @@ const std::vector<SearchResult>& SSfind::search( const std::vector<clipper::RTop
     index_lists.push_back( tmp );
   }
 
+  // make list of results
+  SearchResult rsltnull = { 0.0, -1, -1 };
+  std::vector<SearchResult> rslts( srctrn.size(), rsltnull );
+  for ( int i = 0; i < rslts.size(); i++ ) rslts[i].trn = srctrn[i];
+
   // find ss elements
+  float bestcut = 0.0;  // optimisation: abandon searches where score < bestcut
+  const float bestscl( frccut ); 
   for ( int i = 0; i < rslts.size(); i++ ) {  // loop over map
     float bestscr = rslts[i].score;
     int   bestrot = rslts[i].rot;
+    float bestlim = ( bestscr > bestcut ) ? bestscr : bestcut;
     clipper::Coord_grid cg = grid.deindex( rslts[i].trn );  // coord in grid
     const int index0 = mxgr.index( cg );                    // index in list
     if ( mapbox[index0] > rhocut ) {
@@ -258,21 +275,26 @@ const std::vector<SearchResult>& SSfind::search( const std::vector<clipper::RTop
 	float hi = mapbox[index0+index_list[0].first ];
 	float lo = mapbox[index0+index_list[0].second];
 	int i = 1;
-	while ( hi - lo > bestscr ) {                     // loop over points
+	while ( hi - lo > bestlim ) {                     // loop over points
 	  hi = clipper::Util::min( hi, mapbox[index0+index_list[i].first ] );
 	  lo = clipper::Util::max( lo, mapbox[index0+index_list[i].second] );
 	  i++;
 	  if ( !( i < index_list.size() ) ) break;
 	}
-	if ( hi - lo > bestscr ) {
-	  bestscr = hi - lo;
+	if ( hi - lo > bestlim ) {
+	  bestlim = bestscr = hi - lo;
 	  bestrot = r;
 	}
       }
     }
     rslts[i].score = bestscr;  // store
     rslts[i].rot   = bestrot;
+    bestcut = clipper::Util::max( bestscl*bestscr, bestcut );  // optimisation
   }
+
+  // eliminate any results which would have been eliminated by the cutoff
+  for ( int i = 0; i < rslts.size(); i++ )
+    if ( rslts[i].score < bestcut ) rslts[i] = rsltnull;
 
   return rslts;
 }
@@ -355,7 +377,7 @@ bool Ca_find::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xm
   double zwt = 2.0;  // EXPECTED Z-DIFF BETWEEN CORRECT AND RANDOM SCORES
   Score_list<clipper::RTop_orth> score_long( 20*nfind );
   for ( int i = 0; i < results.size(); i++ ) {
-    clipper::RTop_orth  rtop = ops[ results[i].rot ].inverse();
+    clipper::RTop_orth  rtop = ops[ results[i].rot ];
     clipper::Coord_grid cg = grid.deindex( results[i].trn );
     rtop.trn() = xmap.coord_orth( cg.coord_map() );
     double score = zwt*results[i].score + prior.get_data(cg);
@@ -426,7 +448,7 @@ void Ca_find::search_op( std::vector<SearchResult>& results, clipper::Xmap<float
 {
   typedef clipper::Xmap<float>::Map_reference_index MRI;
   const clipper::Grid_sampling grid = xlookp1.grid_sampling();
-  srch( xmap1, llktarget.llk_target(), llktarget.llk_weight(), ops[op].inverse() );
+  srch( xmap1, llktarget.llk_target(), llktarget.llk_weight(), ops[op] );
   for ( MRI ix = xmap1.first(); !ix.last(); ix.next() ) {
     const int i = xlookp1[ix];
     if ( xmap1[ix] < results[i].score ) {
@@ -467,15 +489,15 @@ std::vector<SearchResult> Ca_find::search_llk( const clipper::Xmap<float>& xmap,
   clipper::Map_stats zstats( xmap1 );
 
   // do the search
-  SearchResult resultnull = { 1.0e20, 0, 0 };
-  std::vector<SearchResult> result( lresult, resultnull );
-  for ( int op = 0; op < ops.size(); op++ )
-    search_op( result, xmap1, xlookp1, srch, llktarget, ops, op );
   /*
+    SearchResult result = { 1.0e20, 0, 0 };
+    std::vector<SearchResult> results( lresult, result );
+    for ( int op = 0; op < ops.size(); op++ )
+    search_op( results, xmap1, xlookp1, srch, llktarget, ops, op );
+  */
   Search_threaded sthr( xlookp1, srch, llktarget, ops, lresult );
   sthr( ncpu );
   std::vector<SearchResult> result = sthr.results();
-  */
     
   // convert to Z scores
   for ( int i = 0; i < result.size(); i++ )
@@ -500,12 +522,13 @@ std::vector<SearchResult> Ca_find::search_sec( const clipper::Xmap<float>& xmap,
   // prepare target map
   SSfind ssfind;
   ssfind.prep_xmap( xmap, rad );
+  ssfind.prep_search( xmap );
 
   /*
   // do initial search with itentity op to get stats
   clipper::RTop_orth rtid( clipper::RTop_orth::identity() );
   std::vector<clipper::RTop_orth> opsid( 1, rtid );
-  ssfind.set_target_score( -1.0e20 );
+  ssfind.prep_results( xmap, -1.0e20 );
   ssfind.prep_target( SSfind::ALPHA3, sslen );
   ssfind.search( opsid, -1.0e20 );
   ssfind.prep_target( SSfind::BETA3, sslen );
@@ -522,12 +545,16 @@ std::vector<SearchResult> Ca_find::search_sec( const clipper::Xmap<float>& xmap,
   */
 
   // do full search
-  ssfind.set_target_score( 0.0 );
-  ssfind.prep_target( SSfind::ALPHA3, sslen );
-  ssfind.search( ops, sigcut );
-  ssfind.prep_target( SSfind::BETA3, sslen );
-  ssfind.search( ops, sigcut );
-  std::vector<SearchResult> result = ssfind.results();
+  SSfind::Target targeta( SSfind::ALPHA3, sslen );
+  SSfind::Target targetb( SSfind::BETA3 , sslen );
+  std::vector<SearchResult> resulta, resultb;
+  resulta = ssfind.search( targeta.target_coords(), ops, sigcut, 0.0 );
+  resultb = ssfind.search( targetb.target_coords(), ops, sigcut, 0.0 );
+  std::vector<SearchResult> result( resulta.size() );
+  for ( int i = 0; i < result.size(); i++ ) {
+    if ( resulta[i].score > resultb[i].score ) result[i] = resulta[i];
+    else                                       result[i] = resultb[i];
+  }
 
   // rescore
   double s0(0.0), s1(0.0), s2(0.0);
@@ -537,7 +564,7 @@ std::vector<SearchResult> Ca_find::search_sec( const clipper::Xmap<float>& xmap,
       xmap.coord_orth( grid.deindex( result[i].trn ).coord_map() );
     // update score for target
     if ( result[i].rot >= 0 ) {
-      clipper::RTop_orth rtop( ops[ result[i].rot ].inverse().rot(), co );
+      clipper::RTop_orth rtop( ops[ result[i].rot ].rot(), co );
       result[i].score = llktarget.llk_approx( xmap, rtop );
     } else {
       result[i].score = 1.0e20;
@@ -597,4 +624,67 @@ std::vector<SearchResult> Ca_find::search_sec( const clipper::Xmap<float>& xmap,
     if ( result[i].rot >= 0 ) result_trim.push_back( result[i] );
 
   return result_trim;
+}
+
+
+// Threadable search class methods
+
+Search_threaded::Search_threaded( const clipper::Xmap<int>& xlookp1, const clipper::FFFear_fft<float>& srch, const LLK_map_target& llktarget, const std::vector<clipper::RTop_orth>& ops, const int lresult ) : xlookp1_(&xlookp1), srch_(&srch), llktarget_(&llktarget), ops_(ops)
+{
+  // set up work map
+  const clipper::Cell&          cell = xlookp1.cell();
+  const clipper::Grid_sampling& grid = xlookp1.grid_sampling();
+  xmap1_.init( clipper::Spacegroup::p1(), cell, grid );
+  SearchResult result = { 1.0e20, 0, 0 };
+  results_ = std::vector<SearchResult>( lresult, result );
+
+  n1_ = n2_ = 0;
+  done = false;
+}
+
+void Search_threaded::search( const int& op )
+{
+  Ca_find::search_op( results_, xmap1_, *xlookp1_, *srch_, *llktarget_, ops_,
+		      op );
+}
+
+bool Search_threaded::operator() ( int nthread )
+{
+  bool thread = ( nthread > 0 );
+  // try running multi-threaded
+  const int n = ops_.size();
+  if ( thread ) {
+    std::vector<Search_threaded> threads( nthread-1, (*this) );
+    set_range( 0, n/nthread );
+    for ( int i = 0; i < threads.size(); i++ )
+      threads[i].set_range( ((i+1)*n)/nthread, ((i+2)*n)/nthread );
+    done = true;
+    run();  for ( int i = 0; i < threads.size(); i++ ) threads[i].run();
+    join(); for ( int i = 0; i < threads.size(); i++ ) threads[i].join();
+    for ( int i = 0; i < threads.size(); i++ ) merge( threads[i] );
+    // check that it finished
+    if ( !done ) thread = false;
+  }
+  // else run in main thread
+  if ( !thread ) {
+    int lresult = results_.size();
+    SearchResult result = { 1.0e20, 0, 0 };
+    results_ = std::vector<SearchResult>( lresult, result );
+    for ( int op = 0; op < n; op++ ) search( op );
+  }
+  return true;
+}
+
+void Search_threaded::merge( const Search_threaded& other )
+{
+  for ( int i = 0; i < results_.size(); i++ )
+    if ( other.results_[i].score < results_[i].score )
+      results_[i] = other.results_[i];
+  done = done && other.done;
+}
+
+void Search_threaded::Run()
+{
+  for ( int n = n1_; n < n2_; n++ ) search( n );
+  done = true;
 }

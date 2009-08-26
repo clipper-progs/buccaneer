@@ -58,29 +58,32 @@ bool Ca_ncsbuild::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
 	  mol_wrk[c][r].set_type( "UNK" );
       // join
       Ca_join::join( mol_wrk, 2.0, 2.0, com );
-      if ( mol_wrk[0].size() > mp1.size() ) {  // optimisation
-	// sequence
-	Ca_sequence::sequence( mol_wrk[0], xmap, llksample, seq, reliability_ );
-	// filter
-	Ca_filter::filter( mol_wrk, xmap, 1.0 );
-	// tidy
-	ProteinTools::chain_tidy( mol_wrk );
-	// make new chain
-	if ( mol_wrk.size() > 0 ) mp2 = mol_wrk[0];
-	mp2.copy( mp1, clipper::MM::COPY_MP );
+      if ( mol_wrk.size() > 0 ) {  // trap empty models
+        if ( mol_wrk[0].size() > mp1.size() ) {  // optimisation
+	  // sequence
+	  Ca_sequence::prepare_scores( mol_wrk[0], xmap, llksample );
+	  Ca_sequence::sequence( mol_wrk[0], seq, reliability_ );
+	  // filter
+	  Ca_filter::filter( mol_wrk, xmap, 1.0 );
+	  // tidy
+	  ProteinTools::chain_tidy( mol_wrk );
+	  // make new chain
+	  if ( mol_wrk.size() > 0 ) mp2 = mol_wrk[0];
+	  mp2.copy( mp1, clipper::MM::COPY_MP );
+	  // test if the chain is improved
+	  int l0, l1, s0, s1;
+	  l0 = mp1.size();
+	  l1 = mp2.size();
+	  s0 = s1 = 0;
+	  for ( int r = 0; r < mp1.size(); r++ )
+	    if ( ProteinTools::residue_index_3( mp1[r].type() ) >= 0 ) s0++;
+	  for ( int r = 0; r < mp2.size(); r++ )
+	    if ( ProteinTools::residue_index_3( mp2[r].type() ) >= 0 ) s1++;
+	  // if new chain is better, keep it
+	  if ( l1 > l0 && s1 > s0 )
+	    mol[chn1] = mp2;
+        }
       }
-      // test if the chain is improved
-      int l0, l1, s0, s1;
-      l0 = mp1.size();
-      l1 = mp2.size();
-      s0 = s1 = 0;
-      for ( int r = 0; r < mp1.size(); r++ )
-	if ( ProteinTools::residue_index_3( mp1[r].type() ) >= 0 ) s0++;
-      for ( int r = 0; r < mp2.size(); r++ )
-	if ( ProteinTools::residue_index_3( mp2[r].type() ) >= 0 ) s1++;
-      // if new chain is better, keep it
-      if ( l1 > l0 && s1 > s0 )
-	mol[chn1] = mp2;
     }
   }
 

@@ -352,11 +352,12 @@ bool ProteinTools::chain_renumber( clipper::MPolymer& pol, const clipper::MMolec
     result = align( chnseq, seqseq );
     int scr = 0;
     for ( int i = 0; i < result.first.size(); i++ ) {
-      if ( result.first[i] >= 0 )
+      if ( result.first[i] >= 0 ) {
 	if ( chnseq[i] == seqseq[result.first[i]] )
 	  scr++;
 	else
 	  scr--;
+      }
     }
     if ( scr > bestscr ) {
       bestchn = chn;
@@ -620,6 +621,63 @@ bool ProteinTools::copy_residue_types( clipper::MiniMol& target, const clipper::
 }
 
 
+bool ProteinTools::copy_other_atoms( clipper::MiniMol& target, const clipper::MiniMol& source, unsigned int types )
+{
+  // copy all the atoms to a dummy chain
+  clipper::MPolymer mp;
+  mp.set_id( "" );
+  int maxseq = 0;
+  int offset = 0;
+  if ( types & NONPROTEIN )
+    for ( int c = 0; c < source.size(); c++ )
+      for ( int r = 0; r < source[c].size(); r++ ) {
+	bool sol = ( source[c][r].type() == "HOH" || 
+		     source[c][r].type() == "H2O" || 
+		     source[c][r].type() == "WAT" );
+	bool prt = !Ca_group( source[c][r] ).is_null();
+	if ( source[c][r].size() != 1 && !sol && !prt ) {
+	  clipper::MMonomer mm = source[c][r];
+	  if ( mm.seqnum()+offset <= maxseq ) offset = mm.seqnum()-maxseq+2;
+	  mm.set_seqnum( mm.seqnum() + offset );
+	  mp.insert( mm );
+	  maxseq = mm.seqnum();
+	}
+      }
+  if ( types & SUBSTRUCTURE )
+    for ( int c = 0; c < source.size(); c++ )
+      for ( int r = 0; r < source[c].size(); r++ ) {
+	bool sol = ( source[c][r].type() == "HOH" || 
+		     source[c][r].type() == "H2O" || 
+		     source[c][r].type() == "WAT" );
+	//bool prt = !Ca_group( source[c][r] ).is_null();
+	if ( source[c][r].size() == 1 && !sol ) {
+	  clipper::MMonomer mm = source[c][r];
+	  if ( mm.seqnum()+offset <= maxseq ) offset = maxseq-mm.seqnum()+2;
+	  mm.set_seqnum( mm.seqnum() + offset );
+	  mp.insert( mm );
+	  maxseq = mm.seqnum();
+	}
+      }
+  if ( types & SOLVENT )
+    for ( int c = 0; c < source.size(); c++ )
+      for ( int r = 0; r < source[c].size(); r++ ) {
+	bool sol = ( source[c][r].type() == "HOH" || 
+		     source[c][r].type() == "H2O" || 
+		     source[c][r].type() == "WAT" );
+	//bool prt = !Ca_group( source[c][r] ).is_null();
+	if ( sol ) {
+	  clipper::MMonomer mm = source[c][r];
+	  if ( mm.seqnum()+offset <= maxseq ) offset = mm.seqnum()-maxseq+2;
+	  mm.set_seqnum( mm.seqnum() + offset );
+	  mp.insert( mm );
+	  maxseq = mm.seqnum();
+	}
+      }
+  target.insert( mp );
+  return true;
+}
+
+
 bool ProteinTools::globularise( clipper::MiniMol& mol, const clipper::Coord_frac cent )
 {
   typedef clipper::MMonomer Mm;
@@ -676,6 +734,7 @@ bool ProteinTools::globularise( clipper::MiniMol& mol, const clipper::Coord_frac
   return true;
 }
 
+
 bool ProteinTools::globularise( clipper::MiniMol& mol )
 {
   // iteratively globularise the model
@@ -696,6 +755,7 @@ bool ProteinTools::globularise( clipper::MiniMol& mol )
   }
   return true;
 }
+
 
 bool ProteinTools::symm_match( clipper::MiniMol& molwrk, const clipper::MiniMol& molref )
 {

@@ -121,11 +121,12 @@ target_fn, const std::vector<std::vector<double> >& args ) const
 	  fn[i] = target_fn( params[i] );
 	}
     }
-    if ( debug_mode )  // DEBUG OUTPUT
+    if ( debug_mode ) {  // DEBUG OUTPUT
       if      ( step == EXTN ) std::cout << "Extn-step\n";
       else if ( step == NRML ) std::cout << "Nrml-step\n";
       else if ( step == CTRN ) std::cout << "Ctrn-step\n";
       else                     std::cout << "Ctrx-step\n";
+    }
   }
   return params[ib];
 }

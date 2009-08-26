@@ -32,7 +32,32 @@ class Ca_grow {
 };
 
 
-//! class for refining grown Ca groups
+//! class for growing for Ca groups
+class Grow_threaded : public clipper::Thread_base {
+ public:
+  Grow_threaded() {}
+  Grow_threaded( const std::vector<Ca_chain>& chains, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const double& cutoff, const int& n_grow );
+  void grow( const int& chn );
+  const std::vector<Ca_chain>& result() const { return chains_; }
+  //! run single or multi-threaded
+  bool operator() ( int nthread = 0 );
+  //! merge results from multiple threads
+  void merge( const Grow_threaded& other );
+ private:
+  void Run();        //!< the thread 'Run' method
+  static int count;  //!< Thread control parameter
+  // all data required for calculation is stored in the class
+  std::vector<Ca_chain> chains_;
+  const clipper::Xmap<float>* xmap_;
+  const LLK_map_target* llktarget_;
+  std::vector<bool> done;
+  double cutoff_;
+  int ngrow;
+  clipper::Ramachandran rama1, rama2;
+};
+
+
+////! class for refining grown Ca groups
 class Target_fn_refine_n_terminal_build : Target_fn_order_zero
 {
  public:

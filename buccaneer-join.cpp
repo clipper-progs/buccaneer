@@ -15,40 +15,42 @@ struct Tri_residue {
 };
 
 
-// find longest single chain ignoring loops
-std::vector<int> Ca_join::longest_chain( std::vector<std::vector<int> >& fwd_ptrs ) {
+// find best single chain ignoring loops
+std::vector<int> Ca_join::best_chain( std::vector<Node>& nodes )
+{
   // first make a list of loop starts
-  std::vector<int> node_count( fwd_ptrs.size(), 0 );
+  std::vector<float> node_score( nodes.size(), 0.0 );
   // loop starts are now marks as 0
   // declare a list of 'dirty' nodes
   std::set<int> dirty;
-  for ( int i = 0; i < node_count.size(); i++ )
-    if ( node_count[i] == 0 ) dirty.insert( i );
+  for ( int i = 0; i < node_score.size(); i++ )
+    if ( node_score[i] == 0.0 ) dirty.insert( i );
   // now propogate the values
-  std::vector<int> bck_ptrs( fwd_ptrs.size(), -1 );
+  std::vector<int> bck_ptrs( nodes.size(), -1 );
   while ( dirty.size() > 0 ) {
-    // get a node fromt he dirty list and remove it from the list
+    // get a node from the dirty list and remove it from the list
     std::set<int>::iterator iter = dirty.begin();
     int node = *iter;
     dirty.erase( iter );
     // now check the children
-    for ( int j = 0; j < fwd_ptrs[node].size(); j++ ) {
-      int next_node = fwd_ptrs[node][j];
+    for ( int j = 0; j < nodes[node].ptrs.size(); j++ ) {
+      int next_node = nodes[node].ptrs[j];
       // test whether we've found a longer route
-      if ( node_count[next_node] < node_count[node]+1 ) {
+      float next_score = node_score[node] + nodes[next_node].score;
+      if ( node_score[next_node] < next_score ) {
 	// check here for loops and broken paths
 	int back_node = node;
 	int back_node_next;
 	while ( bck_ptrs[back_node] >= 0 ) {
 	  back_node_next = bck_ptrs[back_node];
 	  if ( back_node_next == next_node ) break;
-	  if ( node_count[back_node_next] >= node_count[back_node] ) break;
+	  if ( node_score[back_node_next] >= node_score[back_node] ) break;
 	  back_node = back_node_next;
 	}
 	// if the path to this node is clean, we can update the node
 	if ( bck_ptrs[back_node] < 0 ) {
 	  // if this is a longer non-looped route, store it
-	  node_count[next_node] = node_count[node]+1;
+	  node_score[next_node] = next_score;
 	  bck_ptrs[next_node] = node;
 	  dirty.insert( next_node );
 	}
@@ -56,9 +58,9 @@ std::vector<int> Ca_join::longest_chain( std::vector<std::vector<int> >& fwd_ptr
     }
   }
   // we've found all the long routes, now find the longest and back-trace it
-  int node_max = 0;
-  for ( int i = 1; i < node_count.size(); i++ )
-    if ( node_count[i] > node_count[node_max] )
+  float node_max = 0.0;
+  for ( int i = 1; i < node_score.size(); i++ )
+    if ( node_score[i] > node_score[node_max] )
       node_max = i;
   // and back-trace
   std::vector<int> result;
@@ -172,9 +174,10 @@ bool Ca_join::join( clipper::MiniMol& mol, const double& rmerg, const double& rj
   }
 
   // make a list of joins
-  std::vector<std::vector<int> > joins( fragments.size() );
+  std::vector<Node> joins( fragments.size() );
   for ( int f1 = 0; f1 < fragments.size(); f1++ )
     if ( fragments[f1].flag != 0 ) {
+      joins[f1].score = 1.0;
       clipper::Coord_frac cx0 = fragments[f1].res[0][1].coord_frac(cell);
       clipper::Coord_frac cx1 = fragments[f1].res[1][1].coord_frac(cell);
       clipper::Coord_frac cx2 = fragments[f1].res[2][1].coord_frac(cell);
@@ -190,10 +193,10 @@ bool Ca_join::join( clipper::MiniMol& mol, const double& rmerg, const double& rj
 	    if ( (cx1-cy0).lengthsq(cell) < r2join &&
 		 (cx2-cy1).lengthsq(cell) < r2join ) {
 	      if ( fragments[f1].flag == 1 && fragments[f2].flag == 1 )
-		joins[f1].push_back( f2 );
+		joins[f1].ptrs.push_back( f2 );
 	      else
 		if ( f2 == f1+1 )
-		  joins[f1].push_back( f2 );
+		  joins[f1].ptrs.push_back( f2 );
 	    }
 	  }
 	}
@@ -211,26 +214,24 @@ bool Ca_join::join( clipper::MiniMol& mol, const double& rmerg, const double& rj
 
   // use threading to extract successive longest chains
   std::vector<std::vector<int> > chns;
-  { // code block to avoid windows compiler bugs over use of label "chn"
-    std::vector<int> chn = longest_chain( joins );
-    while ( chn.size() > 5 ) {
-      // add longest chain to list
-      chns.push_back( chn );
-      // remove used fragments
-      for ( int r = 0; r < chn.size(); r++ )
-	fragments[chn[r]].flag = 0;
-      // remove links from used fragments
-      for ( int f = 0; f < joins.size(); f++ )
-	if ( fragments[f].flag == 0 )
-	  joins[f].clear();
-      // and links to used fragments
-      for ( int f = 0; f < joins.size(); f++ )
-	for ( int j = joins[f].size()-1; j >= 0; j-- )
-	  if ( fragments[joins[f][j]].flag == 0 )
-	    joins[f].erase( joins[f].begin() + j );
-      // get longest remaining chain
-      chn = longest_chain( joins );
-    }
+  while (1) {
+    // get longest remaining chain
+    std::vector<int> chn = best_chain( joins );
+    if ( chn.size() < 6 ) break;
+    // add longest chain to list
+    chns.push_back( chn );
+    // remove used fragments
+    for ( int r = 0; r < chn.size(); r++ )
+      fragments[chn[r]].flag = 0;
+    // remove links from used fragments
+    for ( int f = 0; f < joins.size(); f++ )
+      if ( fragments[f].flag == 0 )
+	joins[f].ptrs.clear();
+    // and links to used fragments
+    for ( int f = 0; f < joins.size(); f++ )
+      for ( int j = joins[f].ptrs.size()-1; j >= 0; j-- )
+	if ( fragments[joins[f].ptrs[j]].flag == 0 )
+	  joins[f].ptrs.erase( joins[f].ptrs.begin() + j );
   }
 
   /*

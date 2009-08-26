@@ -13,6 +13,7 @@ class Ca_join {
 
   static bool join( clipper::MiniMol& mol, const double& rmerg, const double& rjoin, const clipper::Coord_orth& com );
  private:
-  static std::vector<int> longest_chain( std::vector<std::vector<int> >& fwd_ptrs );  
+  class Node { public: float score; std::vector<int> ptrs; };
+  static std::vector<int> best_chain( std::vector<Node>& nodes );
   double rmerg, rjoin;
 };

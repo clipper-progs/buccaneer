@@ -15,12 +15,13 @@
 #include "buccaneer-ncsbuild.h"
 #include "buccaneer-prune.h"
 #include "buccaneer-build.h"
+#include "buccaneer-mr.h"
 #include "buccaneer-util.h"
 
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.1.9", "$Date: 2008/10/01" );
+  CCP4Program prog( "cbuccaneer", "1.3.0", "$Date: 2009/06/01" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2008 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -36,6 +37,7 @@ int main( int argc, char** argv )
   clipper::String ippdb_wrk = "NONE";
   clipper::String ipseq_wrk = "NONE";
   clipper::String ippdb_seq = "NONE";
+  clipper::String ippdb_mr  = "NONE";
   clipper::String ipcol_ref_fo = "/*/*/FP";
   clipper::String ipcol_ref_hl = "/*/*/FC";
   clipper::String ipcol_wrk_fo = "NONE";
@@ -73,106 +75,119 @@ int main( int argc, char** argv )
   double moffset = 0.0;
   bool correl = false;
   Ca_prep::Rama_flt rama_flt = Ca_prep::rama_flt_all;
+  unsigned int passthru = 0;
   int verbose = 0;
 
   // command input
   CCP4CommandInput args( argc, argv, true );
   int arg = 0;
   while ( ++arg < args.size() ) {
-    if        ( args[arg] == "-title" ) {
+    std::string key = args[arg];
+    if        ( key == "-title" ) {
       if ( ++arg < args.size() ) title = args[arg];
-    } else if ( args[arg] == "-mtzin-ref" ) {
+    } else if ( key == "-mtzin-ref" ) {
       if ( ++arg < args.size() ) ipmtz_ref = args[arg];
-    } else if ( args[arg] == "-mtzin-wrk" ) {
-      if ( ++arg < args.size() ) ipmtz_wrk = args[arg];
-    } else if ( args[arg] == "-pdbin-ref" ) {
+    } else if ( key == "-pdbin-ref" ) {
       if ( ++arg < args.size() ) ippdb_ref = args[arg];
-    } else if ( args[arg] == "-seqin-wrk" ) {
+    } else if ( key == "-mtzin"        || key == "-mtzin-wrk" ) {
+      if ( ++arg < args.size() ) ipmtz_wrk = args[arg];
+    } else if ( key == "-seqin"        || key == "-seqin-wrk" ) {
       if ( ++arg < args.size() ) ipseq_wrk = args[arg];
-    } else if ( args[arg] == "-pdbin-wrk" ) {
+    } else if ( key == "-pdbin"        || key == "-pdbin-wrk" ) {
       if ( ++arg < args.size() ) ippdb_wrk = args[arg];
-    } else if ( args[arg] == "-pdbin-wrk-sequence-prior" ) {
+    } else if ( key == "-pdbin-mr"     || key == "-pdbin-wrk-mr" ) {
+      if ( ++arg < args.size() ) ippdb_mr  = args[arg];
+    } else if ( key == "-pdbin-sequence-prior" || key == "-pdbin-wrk-sequence-prior" ) {
       if ( ++arg < args.size() ) ippdb_seq = args[arg];
-    } else if ( args[arg] == "-pdbout-wrk" ) {
+    } else if ( key == "-pdbout"      || key == "-pdbout-wrk" ) {
       if ( ++arg < args.size() ) oppdb = args[arg];
-    } else if ( args[arg] == "-mapout" ) {
+    } else if ( key == "-mapout" ) {
       if ( ++arg < args.size() ) opmap  = args[arg];
-    } else if ( args[arg] == "-colin-ref-fo" ) {
+    } else if ( key == "-colin-ref-fo" ) {
       if ( ++arg < args.size() ) ipcol_ref_fo = args[arg];
-    } else if ( args[arg] == "-colin-ref-hl" ) {
+    } else if ( key == "-colin-ref-hl" ) {
       if ( ++arg < args.size() ) ipcol_ref_hl = args[arg];
-    } else if ( args[arg] == "-colin-wrk-fo" ) {
+    } else if ( key == "-colin-fo"     || key == "-colin-wrk-fo" ) {
       if ( ++arg < args.size() ) ipcol_wrk_fo = args[arg];
-    } else if ( args[arg] == "-colin-wrk-hl" ) {
+    } else if ( key == "-colin-hl"     || key == "-colin-wrk-hl" ) {
       if ( ++arg < args.size() ) ipcol_wrk_hl = args[arg];
-    } else if ( args[arg] == "-colin-wrk-phifom" ) {
+    } else if ( key == "-colin-phifom" || key == "-colin-wrk-phifom" ) {
       if ( ++arg < args.size() ) ipcol_wrk_pw = args[arg];
-    } else if ( args[arg] == "-colin-wrk-fc" ) {
+    } else if ( key == "-colin-fc"     || key == "-colin-wrk-fc" ) {
       if ( ++arg < args.size() ) ipcol_wrk_fc = args[arg];
-    } else if ( args[arg] == "-colin-wrk-free" ) {
+    } else if ( key == "-colin-free"   || key == "-colin-wrk-free" ) {
       if ( ++arg < args.size() ) ipcol_wrk_fr = args[arg];
-    } else if ( args[arg] == "-resolution" ) {
+    } else if ( key == "-resolution" ) {
       if ( ++arg < args.size() ) res_in = clipper::String(args[arg]).f();
-    } else if ( args[arg] == "-cycles" ) {
+    } else if ( key == "-cycles" ) {
       if ( ++arg < args.size() ) ncyc  = clipper::String(args[arg]).i();
-    } else if ( args[arg] == "-find" ) {
+    } else if ( key == "-find" ) {
       find = true;
-    } else if ( args[arg] == "-grow" ) {
+    } else if ( key == "-grow" ) {
       grow = true;
-    } else if ( args[arg] == "-join" ) {
+    } else if ( key == "-join" ) {
       join = true;
-    } else if ( args[arg] == "-link" ) {
+    } else if ( key == "-link" ) {
       link = true;
-    } else if ( args[arg] == "-sequence" ) {
+    } else if ( key == "-sequence" ) {
       seqnc = true;
-    } else if ( args[arg] == "-correct" ) {
+    } else if ( key == "-correct" ) {
       corct = true;
-    } else if ( args[arg] == "-filter" ) {
+    } else if ( key == "-filter" ) {
       filtr = true;
-    } else if ( args[arg] == "-ncsbuild" ) {
+    } else if ( key == "-ncsbuild" ) {
       ncsbd = true;
-    } else if ( args[arg] == "-prune" ) {
+    } else if ( key == "-prune" ) {
       prune = true;
-    } else if ( args[arg] == "-rebuild" ) {
+    } else if ( key == "-rebuild" ) {
       build = true;
-    } else if ( args[arg] == "-fast" ) {
+    } else if ( key == "-fast" ) {
       fast = true;
-    } else if ( args[arg] == "-build-semet" ) {
+    } else if ( key == "-build-semet" ) {
       semet = true;
-    } else if ( args[arg] == "-anisotropy-correction" ) {
+    } else if ( key == "-anisotropy-correction" ) {
       doanis = true;
-    } else if ( args[arg] == "-fix-position" ) {
+    } else if ( key == "-fix-position" ) {
       fixpos = true;
-    } else if ( args[arg] == "-output-intermediate-models" ) {
+    } else if ( key == "-output-intermediate-models" ) {
       optemp = true;
-    } else if ( args[arg] == "-fragments" ) {
+    } else if ( key == "-fragments" ) {
       if ( ++arg < args.size() ) nfrag  = clipper::String(args[arg]).i();
-    } else if ( args[arg] == "-fragments-per-100-residues" ) {
+    } else if ( key == "-fragments-per-100-residues" ) {
       if ( ++arg < args.size() ) nfragr = clipper::String(args[arg]).i();
-    } else if ( args[arg] == "-ramachandran-filter" ) {
+    } else if ( key == "-ramachandran-filter" ) {
       if ( ++arg < args.size() ) {
 	if ( args[arg] == "all"      ) rama_flt = Ca_prep::rama_flt_all;
 	if ( args[arg] == "helix"    ) rama_flt = Ca_prep::rama_flt_helix;
 	if ( args[arg] == "strand"   ) rama_flt = Ca_prep::rama_flt_strand;
 	if ( args[arg] == "nonhelix" ) rama_flt = Ca_prep::rama_flt_nonhelix;
       }
-    } else if ( args[arg] == "-main-chain-likelihood-radius" ) {
+    } else if ( key == "-pass-through" ) {
+      if ( ++arg < args.size() ) {
+	std::vector<clipper::String> s=clipper::String(args[arg]).split(",");
+	for ( int t = 0; t < s.size(); t++ ) {
+	  if ( s[t] == "nonprotein"  ) passthru |= ProteinTools::NONPROTEIN;
+	  if ( s[t] == "substructure") passthru |= ProteinTools::SUBSTRUCTURE;
+	  if ( s[t] == "solvent"     ) passthru |= ProteinTools::SOLVENT;
+	}
+      }
+    } else if ( key == "-main-chain-likelihood-radius" ) {
       if ( ++arg < args.size() ) main_tgt_rad = clipper::String(args[arg]).f();
-    } else if ( args[arg] == "-side-chain-likelihood-radius" ) {
+    } else if ( key == "-side-chain-likelihood-radius" ) {
       if ( ++arg < args.size() ) side_tgt_rad = clipper::String(args[arg]).f();
-    } else if ( args[arg] == "-sequence-reliability" ) {
+    } else if ( key == "-sequence-reliability" ) {
       if ( ++arg < args.size() ) seq_rel = clipper::String(args[arg]).f();
-    } else if ( args[arg] == "-new-residue-name" ) {
+    } else if ( key == "-new-residue-name" ) {
       if ( ++arg < args.size() ) newresname = args[arg];
-    } else if ( args[arg] == "-new-residue-type" ) {
+    } else if ( key == "-new-residue-type" ) {
       if ( ++arg < args.size() ) newrestype = args[arg];
-    } else if ( args[arg] == "-offset" ) {
+    } else if ( key == "-offset" ) {
       if ( ++arg < args.size() ) moffset = clipper::String(args[arg]).f();
-    } else if ( args[arg] == "-correlation-mode" ) {
+    } else if ( key == "-correlation-mode" ) {
       correl = true;
-    } else if ( args[arg] == "-jobs" || args[arg] == "-j" ) {
+    } else if ( key == "-jobs" || key == "-j" ) {
       if ( ++arg < args.size() ) ncpu = clipper::String(args[arg]).i();
-    } else if ( args[arg] == "-verbose" ) {
+    } else if ( key == "-verbose" ) {
       if ( ++arg < args.size() ) verbose = clipper::String(args[arg]).i();
     } else {
       std::cout << "\nUnrecognized:\t" << args[arg] << std::endl;
@@ -180,7 +195,7 @@ int main( int argc, char** argv )
     }
   }
   if ( args.size() <= 1 ) {
-    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin-wrk <filename>\t\tCOMPULSORY\n\t-seqin-wrk <filename>\n\t-pdbin-wrk <filename>\n\t-pdbin-wrk-sequence-prior <filename>\n\t-pdbout-wrk <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-wrk-fo <colpath>\t\tCOMPULSORY\n\t-colin-wrk-hl <colpath> or -colin-wrk-phifom <colpath>\tCOMPULSORY\n\t-colin-wrk-fc <colpath>\n\t-colin-wrk-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 6 main steps:\n finding, growing, joining, sequencing, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input chains are grown.\n";
+    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-pass-through <type[,type]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input model is extended.\n";
     exit(1);
   }
 
@@ -200,6 +215,7 @@ int main( int argc, char** argv )
   using clipper::data32::Flag;
   clipper::Resolution resol;
   clipper::CCP4MTZfile mtzfile;
+  mtzfile.set_column_label_mode( clipper::CCP4MTZfile::Legacy );
   std::string msg;
   const int mmdbflags = MMDBF_IgnoreBlankLines | MMDBF_IgnoreDuplSeqNum | MMDBF_IgnoreNonCoorPDBErrors | MMDBF_IgnoreRemarks;
   ProteinTools proteintools = ProteinTools();
@@ -278,24 +294,32 @@ int main( int argc, char** argv )
     wrk_hl.compute( wrk_pw, Compute_abcd_from_phifom() );
 
   // Get reference model
-  clipper::MiniMol mol_ref, mol_wrk, mol_seq, mol_wrk_in, mol_tmp;
+  clipper::Spacegroup cspg = hkls_wrk.spacegroup();
+  clipper::MiniMol mol_ref, mol_wrk_in, mol_tmp;
+  clipper::MiniMol mol_wrk(cspg,cxtl), mol_mr(cspg,cxtl), mol_seq(cspg,cxtl);
   clipper::MMDBfile mmdb_ref;
   mmdb_ref.SetFlag( mmdbflags );
   mmdb_ref.read_file( ippdb_ref );
   mmdb_ref.import_minimol( mol_ref );
 
   // Get work model (optional)
-  mol_wrk.init( hkls_wrk.spacegroup(), cxtl );
   if ( ippdb_wrk != "NONE" ) {
     clipper::MMDBfile mmdb_wrk;
     mmdb_wrk.SetFlag( mmdbflags );
     mmdb_wrk.read_file( ippdb_wrk );
     mmdb_wrk.import_minimol( mol_tmp );
-    mol_wrk.copy( mol_tmp, clipper::MM::COPY_MPC );
+    for ( int c = 0; c < mol_tmp.size(); c++ )
+      if ( mol_tmp[c].id() != "!" ) mol_wrk.insert( mol_tmp[c] );
   }
-  mol_wrk_in = mol_wrk;
+  // Get MR model
+  if ( ippdb_mr  != "NONE" ) {
+    clipper::MMDBfile mmdb_wrk;
+    mmdb_wrk.SetFlag( mmdbflags );
+    mmdb_wrk.read_file( ippdb_mr );
+    mmdb_wrk.import_minimol( mol_tmp );
+    mol_mr.copy( mol_tmp, clipper::MM::COPY_MPC );
+  }
   // Get sequencing model - heavy atoms or MR (optional)
-  mol_seq.init( hkls_wrk.spacegroup(), cxtl );
   if ( ippdb_seq != "NONE" ) {
     clipper::MMDBfile mmdb_wrk;
     mmdb_wrk.SetFlag( mmdbflags );
@@ -305,6 +329,8 @@ int main( int argc, char** argv )
     Ca_sequence::set_prior_model( mol_seq );
     log.log( "", mol_seq, verbose>9 );
   }
+  // store a copy of the input model
+  mol_wrk_in = mol_wrk;
 
   // Get work sequence (optional)
   clipper::MMoleculeSequence seq_wrk;
@@ -359,7 +385,6 @@ int main( int argc, char** argv )
     wrk_pw.compute( wrk_hl, Compute_phifom_from_abcd() );
     if ( ipcol_wrk_fc == "NONE" )
       wrk_fp.compute( wrk_fwrk, wrk_pw, Compute_fphi_from_fsigf_phifom() );
-    clipper::Spacegroup cspg = hkls_wrk.spacegroup();
     clipper::Grid_sampling grid( cspg, cxtl, hkls_wrk.resolution() );
     clipper::Xmap<float>   xwrk( cspg, cxtl, grid );
     xwrk.fft_from( wrk_fp );
@@ -526,6 +551,13 @@ int main( int argc, char** argv )
     // adjust residue numbers
     for ( int c = 0; c < mol_wrk.size(); c++ )
       if ( c < 26 ) ProteinTools::chain_renumber( mol_wrk[c], seq_wrk );
+
+    // add chains from MR model and from input model
+    Ca_mr camr( 2.0 );
+    if ( ippdb_mr != "NONE" )
+      camr( mol_wrk, mol_mr );
+    if ( passthru )
+      ProteinTools::copy_other_atoms( mol_wrk, mol_wrk_in, passthru );
 
     // write answers
     clipper::MMDBfile mmdb;

@@ -23,3 +23,25 @@ class Ca_prep {
   bool correl_, seqnc_, debug_;
   static int ncpu;
 };
+
+
+//! class for growing for Ca groups
+class Prep_threaded : public clipper::Thread_base {
+ public:
+  Prep_threaded() {}
+  Prep_threaded( std::vector<LLK_map_target>& targets, const clipper::Xmap<float>& xmap, const std::vector<std::vector<clipper::RTop_orth> >& rtops );
+  void prep( const int& count );
+  const std::vector<LLK_map_target> result() const { return targets_; }
+  //! run single or multi-threaded
+  bool operator() ( int nthread = 0 );
+  //! merge results from multiple threads
+  void merge( const Prep_threaded& other );
+ private:
+  void Run();        //!< the thread 'Run' method
+  static int count;  //!< Thread control parameter
+  // all data required for calculation is stored in the class
+  std::vector<LLK_map_target> targets_;
+  const clipper::Xmap<float>* xmap_;
+  const std::vector<std::vector<clipper::RTop_orth> > rtops_;
+  std::vector<bool> done;
+};

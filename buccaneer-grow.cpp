@@ -44,15 +44,15 @@ bool Ca_grow::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xm
   double cutoff = llktarget.llk_distribution( 0.01 );
 
   // grow the chains
+  /*
   clipper::Ramachandran rama1( clipper::Ramachandran::All );
   clipper::Ramachandran rama2( clipper::Ramachandran::NonGly );
   for ( int chn = 0; chn < chains.size(); chn++ )
     grow( chains[chn], xmap, llktarget,	rama1, rama2, cutoff, ngrow );
-  /*
+  */
   Grow_threaded grow( chains, xmap, llktarget, cutoff, ngrow );
   grow( ncpu );
   chains = grow.result();
-  */
 
   // make a new mmdb
   mol = clipper::MiniMol( mold.spacegroup(), mold.cell() );
@@ -239,6 +239,70 @@ Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   //       llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
   // and return it
   return ca1;
+}
+
+
+// thread methods
+
+int Grow_threaded::count = 0;
+
+Grow_threaded::Grow_threaded( const std::vector<Ca_chain>& chains, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const double& cutoff, const int& n_grow ) : chains_(chains), xmap_(&xmap), llktarget_(&llktarget), cutoff_(cutoff), ngrow(n_grow)
+{
+  rama1 = clipper::Ramachandran( clipper::Ramachandran::All );
+  rama2 = clipper::Ramachandran( clipper::Ramachandran::NonGly );
+
+  // flag which chains were grown
+  done = std::vector<bool>( chains_.size(), false );
+
+  // init thread count
+  count = 0;
+}
+
+void Grow_threaded::grow( const int& chn )
+{
+  Ca_grow::grow( chains_[chn], *xmap_, *llktarget_,
+		 rama1, rama2, cutoff_, ngrow );
+  done[chn] = true;
+}
+
+bool Grow_threaded::operator() ( int nthread )
+{
+  bool thread = ( nthread > 0 );
+  // try running multi-threaded
+  if ( thread ) {
+    std::vector<Grow_threaded> threads( nthread-1, (*this) );
+    run();  for ( int i = 0; i < threads.size(); i++ ) threads[i].run();
+    join(); for ( int i = 0; i < threads.size(); i++ ) threads[i].join();
+    // check that it finished
+    if ( count >= chains_.size() ) {
+      for ( int i = 0; i < threads.size(); i++ ) merge( threads[i] );
+    } else {
+      thread = false;
+    }
+  }
+  // else run in main thread
+  if ( !thread ) {
+    for ( int chn = 0; chn < chains_.size(); chn++ ) grow( chn );
+  }
+  return true;
+}
+
+void Grow_threaded::merge( const Grow_threaded& other )
+{
+  for ( int chn = 0; chn < chains_.size(); chn++ )
+    if ( other.done[chn] )
+      chains_[chn] = other.chains_[chn];
+}
+
+void Grow_threaded::Run()
+{
+  while (1) {
+    lock();
+    int chn = count++;
+    unlock();
+    if ( chn >= chains_.size() ) break;
+    grow( chn );
+  }
 }
 
 

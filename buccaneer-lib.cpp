@@ -180,8 +180,10 @@ std::vector<clipper::RTop_orth> LLK_map_target::rtop_list( const clipper::Spaceg
 	if ( adeg <= alim && bdeg <= blim && gdeg <= glim ) {
 	  float alpha = clipper::Util::d2rad(adeg);
 	  float gamma = clipper::Util::d2rad(gdeg);
-	  clipper::Euler_ccp4 euler( alpha, beta, gamma );
-	  ops.push_back(clipper::RTop_orth(clipper::Rotation(euler).matrix()));
+	  const clipper::Euler_ccp4 euler( alpha, beta, gamma );
+          const clipper::Rotation   rotn(euler);
+          const clipper::RTop_orth  op(rotn.matrix().inverse());
+	  ops.push_back(op);  // Note: inverse above for back compatibility
 	}
       }
   }

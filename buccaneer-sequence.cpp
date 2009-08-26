@@ -29,26 +29,44 @@ double Ca_sequence::phi_approx( double z )
 }
 
 
-// retrieve scores cached in a residue property (checking coords are valid)
-std::vector<double> Ca_sequence::get_cached_scores( clipper::MMonomer& mm, const Ca_group& ca )
+// cache scores in residue properties
+void Ca_sequence::prepare_score( clipper::MMonomer& mm, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llksample )
 {
-  if ( mm.exists_property( "SEQDAT" ) ) {
-    const Sequence_data& sd = static_cast<const clipper::Property<Sequence_data>&>(mm.get_property( "SEQDAT" )).value();
-    if ( ( ca.coord_n()  - sd.ca.coord_n()  ).lengthsq() < 1.0e-3 &&
-	 ( ca.coord_ca() - sd.ca.coord_ca() ).lengthsq() < 1.0e-3 &&
-	 ( ca.coord_c()  - sd.ca.coord_c()  ).lengthsq() < 1.0e-3 )
-      return sd.data;
+  bool cached = false;
+  // check if a valid cached result is cached
+  Ca_group ca( mm );
+  if ( !ca.is_null() ) {
+    if ( mm.exists_property( "SEQDAT" ) ) {
+      const Sequence_data& sd = static_cast<const clipper::Property<Sequence_data>&>(mm.get_property( "SEQDAT" )).value();
+      if ( ( ca.coord_n()  - sd.ca.coord_n()  ).lengthsq() < 1.0e-3 &&
+           ( ca.coord_ca() - sd.ca.coord_ca() ).lengthsq() < 1.0e-3 &&
+           ( ca.coord_c()  - sd.ca.coord_c()  ).lengthsq() < 1.0e-3 )
+        cached = true;
+    }
+    // if not, calculate a result and cache
+    if ( !cached ) {
+      if ( mm.exists_property("SEQDAT") ) mm.delete_property("SEQDAT");
+      const int ntyp = llksample.size();
+      std::vector<double> scores( ntyp, 0.0 );
+      for ( int t = 0; t < ntyp; t++ )
+        scores[t] = llksample[t].target( xmap, ca.rtop_beta_carbon() );
+      Sequence_data sd( ca, scores );
+      mm.set_property( "SEQDAT", clipper::Property<Sequence_data>(sd) );
+    }
   }
-  return std::vector<double>();
 }
 
 
-// cache scores in a residue property
-void Ca_sequence::set_cached_scores( clipper::MMonomer& mm, const Ca_group& ca, const std::vector<double>& scr )
+// cache scores in residue properties
+void Ca_sequence::prepare_scores( clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llksample )
 {
-  if ( mm.exists_property( "SEQDAT" ) ) mm.delete_property( "SEQDAT" );
-  mm.set_property( "SEQDAT",
-		   clipper::Property<Sequence_data>(Sequence_data(ca,scr)) );
+  /*
+  for ( int m = 0; m < mp.size(); m++ )
+    prepare_score( mp[m], xmap, llksample );
+  */
+  Sequence_score_threaded seqsc( mp, xmap, llksample );
+  seqsc( ncpu );
+  mp = seqsc.result();
 }
 
 
@@ -89,6 +107,7 @@ double Ca_sequence::sequence_similarity( const clipper::String& seq1, const clip
 Score_list<clipper::String> Ca_sequence::sequence_combine( const Score_list<clipper::String>& seq, const double& reliability )
 {
   Score_list<clipper::String> result = seq;
+  if ( seq.size() == 0 ) return result;
   int len = seq[0].size();
   clipper::String totseq = std::string( len, '?' );
   clipper::String newseq;
@@ -101,7 +120,6 @@ Score_list<clipper::String> Ca_sequence::sequence_combine( const Score_list<clip
       int j;
       for ( j = i+1; j < seq.size(); j++ )
 	if ( sequence_overlap( seq[i], seq[j] ) > 0.20 ) break;
-      if ( j == seq.size() ) continue;
       double r = phi_approx( seq.score(i) - seq.score(j) );
       // if score difference good then add matched region to sequence
       if ( r < 1.0-reliability ) {
@@ -331,32 +349,25 @@ Score_list<clipper::String> Ca_sequence::sequence_match( const std::vector<std::
 
 /*! Sequence a chain based on the map LLK target, and available
   sequence ranges. */
-Score_list<clipper::String> Ca_sequence::sequence_chain( clipper::MChain& chain, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llktarget, const clipper::MMoleculeSequence& seq )
+Score_list<clipper::String> Ca_sequence::sequence_chain( clipper::MChain& chain, const clipper::MMoleculeSequence& seq )
 {
   typedef clipper::MMonomer Mm;
   int nres = chain.size();
-  int ntyp = llktarget.size();
 
   // for each chain, classify each residue against the density
   std::vector<std::vector<double> > scores( nres );
   for ( int res = 0; res < nres; res++ ) {
-    std::vector<double> scores_type( ntyp, 0.0 );
-    Ca_group ca( chain[res] );
-    if ( !ca.is_null() ) {
-      // OPTIMIZATION: check for cached result
-      std::vector<double> scores_tmp = get_cached_scores( chain[res], ca );
-      if ( scores_tmp.size() != ntyp ) {  // normal path
-	// CALCULATION
-	for ( int t = 0; t < ntyp; t++ )
-	  scores_type[t] = llktarget[t].target( xmap, ca.rtop_beta_carbon() );
-	// OPTIMIZATION: cache result
-	set_cached_scores( chain[res], ca, scores_type );
-      } else {                            // fast path
-	scores_type = scores_tmp;
-      }
+    if ( chain[res].exists_property( "SEQDAT" ) ) {
+      const Sequence_data& sd = static_cast<const clipper::Property<Sequence_data>&>(chain[res].get_property( "SEQDAT" )).value();
+      scores[res] = sd.data;
     }
-    scores[res] = scores_type;
   }
+
+  // check for valid types
+  int ntyp = 0;
+  for ( int res = 0; res < nres; res++ )
+    ntyp = clipper::Util::max( ntyp, int(scores[res].size()) );
+  if ( ntyp == 0 ) return Score_list<clipper::String>();
 
   // normalise across rows by mean with moving average
   std::vector<double> rscores( nres, 0.0 );
@@ -409,14 +420,14 @@ Score_list<clipper::String> Ca_sequence::sequence_chain( clipper::MChain& chain,
 	clipper::Coord_frac cf1, cf2;
 	clipper::Coord_orth co = ca.coord_cb();
 	atoms = nb.atoms_near( co, nb_rad );
-	cf1 = co.coord_frac( xmap.cell() );
+	cf1 = co.coord_frac( molprior.cell() );
 	for ( int i = 0; i < atoms.size(); i++ ) {
 	  const clipper::MAtom& atom =
 	    molprior[atoms[i].polymer()][atoms[i].monomer()][atoms[i].atom()];
-	  cf2 = atom.coord_orth().coord_frac( xmap.cell() );
-	  cf2 = xmap.spacegroup().symop( atoms[i].symmetry() ) * cf2;
+	  cf2 = atom.coord_orth().coord_frac( molprior.cell() );
+	  cf2 = molprior.spacegroup().symop( atoms[i].symmetry() ) * cf2;
 	  cf2 = cf2.lattice_copy_near( cf1 );
-	  double d2 = ( cf2 - cf1 ).lengthsq( xmap.cell() );
+	  double d2 = ( cf2 - cf1 ).lengthsq( molprior.cell() );
 	  if ( d2 <= nb_rad * nb_rad ) {
 	    int t = atoms[i].monomer();
 	    double rad = atom.u_iso();
@@ -507,10 +518,10 @@ void Ca_sequence::sequence_apply( clipper::MChain& chain, const clipper::String&
 }
 
 
-Score_list<clipper::String> Ca_sequence::sequence( clipper::MChain& chain, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llksample, const clipper::MMoleculeSequence& seq, const double& reliability )
+Score_list<clipper::String> Ca_sequence::sequence( clipper::MChain& chain, const clipper::MMoleculeSequence& seq, const double& reliability )
 {
   // do the sequencing
-  Score_list<clipper::String> matches = sequence_chain( chain, xmap, llksample, seq );
+  Score_list<clipper::String> matches = sequence_chain( chain, seq );
 
   // now check for multiple matches
   matches = sequence_combine( matches, reliability );
@@ -546,16 +557,20 @@ bool Ca_sequence::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
   // split into separate chains
   ProteinTools::chain_tidy( mol );
 
-  // do sequencing
+  // score residues
+  for ( int chn = 0; chn < mol.size(); chn++ )
+    prepare_scores( mol[chn], xmap, llksample );
+
+  // and sequence
+  /*
   history = std::vector<Score_list<clipper::String> >( mol.size() );
   for ( int chn = 0; chn < mol.size(); chn++ )
-    history[chn] = sequence( mol[chn], xmap, llksample, seq, reliability_ );
-  /*
-  Sequence_threaded seqnc( mol, xmap, llksample, seq, reliability_ );
+    history[chn] = sequence( mol[chn], seq, reliability_ );  
+  */
+  Sequence_threaded seqnc( mol, seq, reliability_ );
   seqnc( ncpu );
   mol = seqnc.result();
   history = seqnc.history();
-  */
 
   // break chains where the sequence is broken
   ProteinTools::break_chains( mol, xmap );
@@ -660,4 +675,128 @@ void Ca_sequence::set_prior_model( const clipper::MiniMol& mol )
 
   // Store the pseudo-chain
   molprior.insert( mp );
+}
+
+
+
+// thread methods
+
+int Sequence_score_threaded::count = 0;
+
+Sequence_score_threaded::Sequence_score_threaded( clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llksample ) : mp_(mp), xmap_(&xmap), llksample_(&llksample)
+{
+  // flag which chains were grown
+  done = std::vector<bool>( mp_.size(), false );
+
+  // init thread count
+  count = 0;
+}
+
+void Sequence_score_threaded::sequence_score( const int& res )
+{
+  Ca_sequence::prepare_score( mp_[res], *xmap_, *llksample_ );
+  done[res] = true;
+}
+
+bool Sequence_score_threaded::operator() ( int nthread )
+{
+  bool thread = ( nthread > 0 );
+  // try running multi-threaded
+  if ( thread ) {
+    std::vector<Sequence_score_threaded> threads( nthread-1, (*this) );
+    run();  for ( int i = 0; i < threads.size(); i++ ) threads[i].run();
+    join(); for ( int i = 0; i < threads.size(); i++ ) threads[i].join();
+    // check that it finished
+    if ( count >= mp_.size() ) {
+      for ( int i = 0; i < threads.size(); i++ ) merge( threads[i] );
+    } else {
+      thread = false;
+    }
+  }
+  // else run in main thread
+  if ( !thread ) {
+    for ( int res = 0; res < mp_.size(); res++ ) sequence_score( res );
+  }
+  return true;
+}
+
+void Sequence_score_threaded::merge( const Sequence_score_threaded& other )
+{
+  for ( int res = 0; res < mp_.size(); res++ )
+    if ( other.done[res] )
+      mp_[res] = other.mp_[res];
+}
+
+void Sequence_score_threaded::Run()
+{
+  while (1) {
+    lock();
+    int res = count++;
+    unlock();
+    if ( res >= mp_.size() ) break;
+    sequence_score( res );
+  }
+}
+
+
+// thread methods
+
+int Sequence_threaded::count = 0;
+
+Sequence_threaded::Sequence_threaded( const clipper::MiniMol& mol, const clipper::MMoleculeSequence& seq, const double& reliability ) : mol_(mol), seq_(seq), reliability_( reliability )
+{
+  // flag which chains were grown
+  done = std::vector<bool>( mol_.size(), false );
+  history_ = std::vector<Score_list<clipper::String> >( mol_.size() );
+
+  // init thread count
+  count = 0;
+}
+
+void Sequence_threaded::sequence( const int& chn )
+{
+  history_[chn] = Ca_sequence::sequence( mol_[chn], seq_, reliability_ );
+  done[chn] = true;
+}
+
+bool Sequence_threaded::operator() ( int nthread )
+{
+  bool thread = ( nthread > 0 );
+  // try running multi-threaded
+  if ( thread ) {
+    std::vector<Sequence_threaded> threads( nthread-1, (*this) );
+    run();  for ( int i = 0; i < threads.size(); i++ ) threads[i].run();
+    join(); for ( int i = 0; i < threads.size(); i++ ) threads[i].join();
+    // check that it finished
+    if ( count >= mol_.size() ) {
+      for ( int i = 0; i < threads.size(); i++ ) merge( threads[i] );
+    } else {
+      thread = false;
+    }
+  }
+  // else run in main thread
+  if ( !thread ) {
+    for ( int chn = 0; chn < mol_.size(); chn++ ) sequence( chn );
+  }
+  return true;
+}
+
+void Sequence_threaded::merge( const Sequence_threaded& other )
+{
+  for ( int chn = 0; chn < mol_.size(); chn++ )
+    if ( other.done[chn] ) {
+      mol_[chn] = other.mol_[chn];
+      history_[chn] = other.history_[chn];
+    }
+}
+
+void Sequence_threaded::Run()
+{
+  while (1) {
+    lock();
+    int chn = count++;
+    unlock();
+    if ( chn >= mol_.size() ) break;
+    sequence( chn );
+  }
 }
