@@ -59,6 +59,8 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
+host_alias = @host_alias@
+host_triplet = @host@
 
 EXEEXT = @EXEEXT@
 OBJEXT = @OBJEXT@
@@ -81,10 +83,14 @@ MAINT = @MAINT@
 MMDB_CXXFLAGS = @MMDB_CXXFLAGS@
 MMDB_LIBS = @MMDB_LIBS@
 PACKAGE = @PACKAGE@
+PTHREAD_CC = @PTHREAD_CC@
+PTHREAD_CFLAGS = @PTHREAD_CFLAGS@
+PTHREAD_LIBS = @PTHREAD_LIBS@
 STRIP = @STRIP@
 VERSION = @VERSION@
 am__include = @am__include@
 am__quote = @am__quote@
+ax_pthread_config = @ax_pthread_config@
 caniso_LDFLAGS = @caniso_LDFLAGS@
 cbuccaneer_LDFLAGS = @cbuccaneer_LDFLAGS@
 cecalc_LDFLAGS = @cecalc_LDFLAGS@
@@ -131,7 +137,7 @@ INCLUDES = $(CLIPPER_CXXFLAGS) $(FFTW_CXXFLAGS) $(MMDB_CXXFLAGS) \
            $(CCP4_CXXFLAGS) -I$(includedir)
 
 
-LIBS = $(CLIPPER_LIBS) $(FFTW_LIBS) $(CCP4_LIBS) $(MMDB_LIBS) @LIBS@
+LIBS = $(PTHREAD_CFLAGS) $(CLIPPER_LIBS) $(FFTW_LIBS) $(CCP4_LIBS) $(MMDB_LIBS) @LIBS@ $(PTHREAD_LIBS)
 subdir = src/buccaneer
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_CLEAN_FILES =
