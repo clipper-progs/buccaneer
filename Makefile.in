@@ -146,7 +146,8 @@ am_cbuccaneer_OBJECTS = buccaneer-build.$(OBJEXT) \
 	buccaneer-find.$(OBJEXT) cbuccaneer.$(OBJEXT) \
 	buccaneer-prep.$(OBJEXT) simplex-lib.$(OBJEXT) \
 	buccaneer-grow.$(OBJEXT) buccaneer-prot.$(OBJEXT) \
-	simulate-lib.$(OBJEXT) buccaneer-join.$(OBJEXT)
+	simulate-lib.$(OBJEXT) buccaneer-join.$(OBJEXT) \
+	buccaneer-mr.$(OBJEXT)
 cbuccaneer_OBJECTS = $(am_cbuccaneer_OBJECTS)
 cbuccaneer_LDADD = $(LDADD)
 cbuccaneer_DEPENDENCIES =
@@ -171,6 +172,7 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-join.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-lib.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-link.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/buccaneer-mr.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-ncsbuild.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prep.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prot.Po \
@@ -249,6 +251,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-join.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-lib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-link.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-mr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-ncsbuild.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prep.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prot.Po@am__quote@
