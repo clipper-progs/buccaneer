@@ -287,8 +287,9 @@ int main( int argc, char** argv )
 	seq_chn.set_sequence( seq );
 	seq_mol.insert( seq_chn );
 	// reapply it
+        Ca_sequence::prepare_scores(mp, xwrk, llksmp );
 	Score_list<clipper::String> result = 
-	  Ca_sequence::sequence_chain( mp, xwrk, llksmp, seq_mol );
+	  Ca_sequence::sequence_chain( mp, seq_mol );
 	clipper::String s0 = ProteinTools::chain_sequence( mp );
         clipper::String s1 = "";
         double prob = 0.0;
