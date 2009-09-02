@@ -91,6 +91,7 @@ int main( int argc, char** argv )
   using clipper::data32::F_sigF;  using clipper::data32::F_phi;
   using clipper::data32::Phi_fom; using clipper::data32::Flag;
   using clipper::data32::ABCD;
+  const int mmdbflags = MMDBF_IgnoreBlankLines | MMDBF_IgnoreDuplSeqNum | MMDBF_IgnoreNonCoorPDBErrors | MMDBF_IgnoreRemarks;
  
   // Get resolution for calculation
   mtzfile.open_read( ipmtz_ref );
@@ -126,7 +127,7 @@ int main( int argc, char** argv )
   // Get reference model
   clipper::MiniMol mol_ref;
   clipper::MMDBfile mmdb_ref;
-  mmdb_ref.SetFlag( MMDBF_IgnoreBlankLines | MMDBF_IgnoreNonCoorPDBErrors );
+  mmdb_ref.SetFlag( mmdbflags );
   mmdb_ref.read_file( ippdb_ref );
   mmdb_ref.import_minimol( mol_ref );
 
@@ -134,7 +135,7 @@ int main( int argc, char** argv )
   clipper::MiniMol mol_wrk, mol_tmp;
   mol_wrk.init( hkls_wrk.spacegroup(), hkls_wrk.cell() );
   clipper::MMDBfile mmdb_wrk;
-  mmdb_wrk.SetFlag( MMDBF_IgnoreBlankLines | MMDBF_IgnoreNonCoorPDBErrors );
+  mmdb_wrk.SetFlag( mmdbflags );
   mmdb_wrk.read_file( ippdb_wrk );
   mmdb_wrk.import_minimol( mol_tmp );
   mol_wrk.copy( mol_tmp, clipper::MM::COPY_MPC );
@@ -147,7 +148,7 @@ int main( int argc, char** argv )
     if ( scomit ) {
       for ( int c = 0; c < mol_tmp.size(); c++ ) {
 	for ( int r = 0; r < mol_tmp[c].size(); r++ ) {
-	  if ( ProteinTools::residue_index( mol_tmp[c][r].type() ) >= 0 ) {
+	  if ( ProteinTools::residue_index_3( mol_tmp[c][r].type() ) >= 0 ) {
 	    clipper::MMonomer mm;
 	    mm.set_id( mol_tmp[c][r].id() );
 	    mm.set_type( mol_tmp[c][r].type() );
@@ -245,7 +246,7 @@ int main( int argc, char** argv )
 		       mm2[index_ca].coord_orth(),
 		       mm2[index_c ].coord_orth() );
 	  // side chain target:
-	  int type = ProteinTools::residue_index( mm2.type() );
+	  int type = ProteinTools::residue_index_3( mm2.type() );
 	  if ( type >= 0 )
 	    llkcls[type].accumulate( xref, ca.rtop_beta_carbon() );
 	}
@@ -274,7 +275,7 @@ int main( int argc, char** argv )
       clipper::String seq = "";
       clipper::MPolymer mp;
       for ( int r = 0; r < mol_wrk[c].size(); r++ ) {
-	int t = ProteinTools::residue_index( mol_wrk[c][r].type() );
+	int t = ProteinTools::residue_index_3( mol_wrk[c][r].type() );
 	if ( mol_wrk[c][r].type().length() == 3 && t >= 0 ) { 
 	  seq += ProteinTools::residue_code_1( t );
 	  mp.insert( mol_wrk[c][r] );
@@ -287,7 +288,7 @@ int main( int argc, char** argv )
 	seq_chn.set_sequence( seq );
 	seq_mol.insert( seq_chn );
 	// reapply it
-        Ca_sequence::prepare_scores(mp, xwrk, llksmp );
+	Ca_sequence::prepare_scores( mp, xwrk, llksmp );
 	Score_list<clipper::String> result = 
 	  Ca_sequence::sequence_chain( mp, seq_mol );
 	clipper::String s0 = ProteinTools::chain_sequence( mp );
@@ -338,3 +339,4 @@ int main( int argc, char** argv )
     std::cout << std::endl << "------------------------------------------------------------------------" << std::endl;
   }
 }
+
