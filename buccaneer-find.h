@@ -21,7 +21,7 @@ class Ca_find {
  public:
   enum TYPE { LIKELIHOOD, SECSTRUC };
   Ca_find( int n_find = 500, double resol = 1.0 ) : nfind( n_find ), resol_( resol ) {}
-  bool operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const TYPE type = LIKELIHOOD );
+  bool operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const TYPE type = LIKELIHOOD, const int modelindex = 0 );
   static void set_cpus( int cpus ) { ncpu = cpus; }
 
  private:
@@ -36,7 +36,8 @@ class Ca_find {
   std::vector<SearchResult> search_sec( const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget ) const;
   // prepare lateral growing prior
   void prep_prior( clipper::Xmap<float>& prior, const clipper::MiniMol& mol, const double radius=9.0 ) const;
-
+  // modify prior on the basis of multi-model index number
+  void filter_prior( clipper::Xmap<float>& prior, const int modelindex ) const;
   int nfind;
   double resol_;
   std::vector<clipper::RTop_orth> ops;

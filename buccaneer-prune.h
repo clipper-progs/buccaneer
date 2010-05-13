@@ -8,8 +8,10 @@
 //! Class for pruning clashing Ca chains using density
 class Ca_prune {
  public:
-  Ca_prune( clipper::ftype rad = 2.0 ) : rad_(rad) {}
+  Ca_prune( double rad = 3.0 ) : rad_(rad) {}
+  static bool prune( clipper::MiniMol& mol, double rad = 3.0 );
   bool operator() ( clipper::MiniMol& mol ) const;
  private:
+  static std::vector<int> score_positions( const clipper::MPolymer& mp );
   clipper::ftype rad_;
 };

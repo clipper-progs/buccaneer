@@ -526,25 +526,42 @@ bool ProteinTools::chain_tidy( clipper::MiniMol& mol )
   for ( int chn = 0; chn < target.size(); chn++ )
     target[chn] = temp[chnsiz[chn].second];
 
-  // now relabel the chains and residues
-  clipper::String labels1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  clipper::String labels2 = "abcdefghijklmnopqrstuvwxyz";
-  for ( int chn = 0; chn < target.size(); chn++ ) {
-    if ( chn < labels1.length() ) {
-      target[chn].set_id( labels1.substr( chn, 1 ) );
-      for ( int res = 0; res < target[chn].size(); res++ )
-	target[chn][res].set_seqnum( res + 1 );
-    } else {
-      int c = chn - labels1.length();
-      int c1 = c % labels2.length();
-      int c2 = c / labels2.length();
-      target[chn].set_id( labels2.substr( c1, 1 ) );
-      for ( int res = 0; res < target[chn].size(); res++ )
-	target[chn][res].set_seqnum( res + 1 + 1000*c2 );
-    }
+  mol = target;
+  return true;
+}
+
+
+bool ProteinTools::chain_label( clipper::MiniMol& mol, clipper::String chainids )
+{
+  // set up default chain labels
+  std::vector<clipper::String> labels;
+  labels.push_back( "ABCDEFGHIJKLMNOPQRSTUVWXYZ" );
+  labels.push_back( "abcdefghijklmnopqrstuvwxyz" );
+
+  // eliminate labels used in known structure
+  for ( int i = 0; i < labels.size(); i++ ) {
+    clipper::String newlabels;
+    for ( int j = 0; j < labels[i].length(); j++ )
+      if ( chainids.find( labels[i].substr(j,1) ) == clipper::String::npos )
+	newlabels += labels[i].substr(j,1);
+    labels[i] = newlabels;
   }
 
-  mol = target;
+  // label chains
+  for ( int chn = 0; chn < mol.size(); chn++ ) {
+    if ( chn < labels[0].length() ) {
+      mol[chn].set_id( labels[0].substr( chn, 1 ) );
+      for ( int res = 0; res < mol[chn].size(); res++ )
+	mol[chn][res].set_seqnum( res + 1 );
+    } else {
+      int c = chn - labels[0].length();
+      int c1 = c % labels[1].length();
+      int c2 = c / labels[1].length();
+      mol[chn].set_id( labels[1].substr( c1, 1 ) );
+      for ( int res = 0; res < mol[chn].size(); res++ )
+	mol[chn][res].set_seqnum( res + 1 + 1000*c2 );
+    }
+  }
   return true;
 }
 
@@ -617,63 +634,6 @@ bool ProteinTools::copy_residue_types( clipper::MiniMol& target, const clipper::
     }
   }
 
-  return true;
-}
-
-
-bool ProteinTools::copy_other_atoms( clipper::MiniMol& target, const clipper::MiniMol& source, unsigned int types )
-{
-  // copy all the atoms to a dummy chain
-  clipper::MPolymer mp;
-  mp.set_id( "" );
-  int maxseq = 0;
-  int offset = 0;
-  if ( types & NONPROTEIN )
-    for ( int c = 0; c < source.size(); c++ )
-      for ( int r = 0; r < source[c].size(); r++ ) {
-	bool sol = ( source[c][r].type() == "HOH" || 
-		     source[c][r].type() == "H2O" || 
-		     source[c][r].type() == "WAT" );
-	bool prt = !Ca_group( source[c][r] ).is_null();
-	if ( source[c][r].size() != 1 && !sol && !prt ) {
-	  clipper::MMonomer mm = source[c][r];
-	  if ( mm.seqnum()+offset <= maxseq ) offset = mm.seqnum()-maxseq+2;
-	  mm.set_seqnum( mm.seqnum() + offset );
-	  mp.insert( mm );
-	  maxseq = mm.seqnum();
-	}
-      }
-  if ( types & SUBSTRUCTURE )
-    for ( int c = 0; c < source.size(); c++ )
-      for ( int r = 0; r < source[c].size(); r++ ) {
-	bool sol = ( source[c][r].type() == "HOH" || 
-		     source[c][r].type() == "H2O" || 
-		     source[c][r].type() == "WAT" );
-	//bool prt = !Ca_group( source[c][r] ).is_null();
-	if ( source[c][r].size() == 1 && !sol ) {
-	  clipper::MMonomer mm = source[c][r];
-	  if ( mm.seqnum()+offset <= maxseq ) offset = maxseq-mm.seqnum()+2;
-	  mm.set_seqnum( mm.seqnum() + offset );
-	  mp.insert( mm );
-	  maxseq = mm.seqnum();
-	}
-      }
-  if ( types & SOLVENT )
-    for ( int c = 0; c < source.size(); c++ )
-      for ( int r = 0; r < source[c].size(); r++ ) {
-	bool sol = ( source[c][r].type() == "HOH" || 
-		     source[c][r].type() == "H2O" || 
-		     source[c][r].type() == "WAT" );
-	//bool prt = !Ca_group( source[c][r] ).is_null();
-	if ( sol ) {
-	  clipper::MMonomer mm = source[c][r];
-	  if ( mm.seqnum()+offset <= maxseq ) offset = mm.seqnum()-maxseq+2;
-	  mm.set_seqnum( mm.seqnum() + offset );
-	  mp.insert( mm );
-	  maxseq = mm.seqnum();
-	}
-      }
-  target.insert( mp );
   return true;
 }
 

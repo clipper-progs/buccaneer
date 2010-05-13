@@ -7,10 +7,26 @@
 
 
 
-bool Ca_prune::operator() ( clipper::MiniMol& mol ) const
+std::vector<int> Ca_prune::score_positions( const clipper::MPolymer& mp )
+{
+  std::vector<int> scores( mp.size() );
+  int s0 = mp.size();
+  int s1 = 0;
+  for ( int r = 0; r < mp.size(); r++ ) {
+    if ( mp[r].type() != "UNK" ) s1++;
+  }
+  for ( int r = 0; r < mp.size(); r++ ) {
+    scores[r] = s0;
+    if ( mp[r].type() != "UNK" ) scores[r] += 10000;
+  }
+  return scores;
+}
+
+
+bool Ca_prune::prune( clipper::MiniMol& mol, double rad )
 {
   typedef clipper::MMonomer Mm;
-  clipper::ftype r2cut = rad_*rad_;
+  double r2cut = rad*rad;
 
   clipper::Cell       cell = mol.cell();
   clipper::Spacegroup spgr = mol.spacegroup();
@@ -23,6 +39,8 @@ bool Ca_prune::operator() ( clipper::MiniMol& mol ) const
   clipper::Coord_frac cf1, cf2;
   for ( int chn1 = 0; chn1 < moltmp.size()-1; chn1++ ) {
     for ( int chn2 = chn1; chn2 < moltmp.size(); chn2++ ) {
+      std::vector<int> scr1 = score_positions( moltmp[chn1] );
+      std::vector<int> scr2 = score_positions( moltmp[chn2] );
       // find any clashing residues between these chains
       for ( int res1 = 0; res1 < moltmp[chn1].size(); res1++ ) {
 	for ( int res2 = 0; res2 < moltmp[chn2].size(); res2++ ) {
@@ -36,14 +54,11 @@ bool Ca_prune::operator() ( clipper::MiniMol& mol ) const
 	      cf2 = moltmp[chn2][res2][a2].coord_orth().coord_frac(cell);
 	      cf2 = cf2.symmetry_copy_near( spgr, cell, cf1 ) - cf1;
 	      if ( cf2.lengthsq(cell) < r2cut ) {
-		// clash found: if only one is sequenced, keep that,
-		//              otherwise keep the longer.
-		int scr1 = moltmp[chn1].size();
-		int scr2 = moltmp[chn2].size();
-		if ( moltmp[chn1][res1].type() == "UNK" ) scr1 += -1000000;
-		if ( moltmp[chn2][res2].type() == "UNK" ) scr2 += -1000000;
-		if ( scr1 > scr2 ) moltmp[chn2][res2].set_type( "~~~" );
-		else               moltmp[chn1][res1].set_type( "~~~" );
+		// clash found: keep the one with the higher score.
+		if ( scr1[res1] > scr2[res2] )
+		  moltmp[chn2][res2].set_type( "~~~" );
+		else
+		  moltmp[chn1][res1].set_type( "~~~" );
 	      }
 	    }
 	  }
@@ -69,4 +84,10 @@ bool Ca_prune::operator() ( clipper::MiniMol& mol ) const
   }
 
   return true;
+}
+
+
+bool Ca_prune::operator() ( clipper::MiniMol& mol ) const
+{
+  return prune( mol, rad_ );
 }

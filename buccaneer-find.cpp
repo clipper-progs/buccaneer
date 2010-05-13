@@ -323,8 +323,7 @@ void Ca_find::prep_prior( clipper::Xmap<float>& prior, const clipper::MiniMol& m
     f1 = ix.coord().coord_frac(grid);
     atoms = nb.atoms_near( f1.coord_orth(cell), dmin );
     for ( int i = 0; i < atoms.size(); i++ ) {
-      const clipper::MAtom& atom =
-	mol[atoms[i].polymer()][atoms[i].monomer()][atoms[i].atom()];
+      const clipper::MAtom& atom = mol.atom(atoms[i]);
       f2 = atom.coord_orth().coord_frac(cell);
       f2 = spgr.symop(atoms[i].symmetry()) * f2;
       f2 = f2.lattice_copy_near( f1 );
@@ -336,7 +335,28 @@ void Ca_find::prep_prior( clipper::Xmap<float>& prior, const clipper::MiniMol& m
 }
 
 
-bool Ca_find::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const TYPE type )
+void Ca_find::filter_prior( clipper::Xmap<float>& prior, const int modelindex ) const
+{
+  typedef clipper::Xmap<float>::Map_reference_index MRI;
+
+  // for zero index, use all results
+  if ( modelindex <= 0 ) return;
+
+  // otherwise downweight 50% of results on the basis of position in the ASU
+  const int div = (modelindex+1)/2;
+  const int rem = (modelindex+1)%2;
+
+  for ( MRI ix = prior.first(); !ix.last(); ix.next() ) {
+    clipper::Coord_grid cg = ix.coord();
+    const int u = cg.u()/div;
+    const int v = cg.v()/div;
+    const int w = cg.w()/div;
+    if ( ( u + v + w ) % 2 != rem ) prior[ix] += 6.0;
+  }
+}
+
+
+bool Ca_find::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const TYPE type, const int modelindex )
 {
   typedef clipper::Xmap<float>::Map_reference_index MRI;
   const clipper::Spacegroup&    spgr = xmap.spacegroup();
@@ -352,6 +372,9 @@ bool Ca_find::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xm
   // turn the prior into a z-score
   for ( MRI ix = prior.first(); !ix.last(); ix.next() )
     prior[ix] = -log( prior[ix] );
+
+  // filter prior based on multi-model index parameter
+  filter_prior( prior, modelindex );
 
   // do the fffear search:
   const double stepff = 24.0;

@@ -8,15 +8,14 @@
 
 void Ca_build::build_rotate_rotamer( clipper::MMonomer& mm, int nr, int nc )
 {
-  const double dchi = clipper::Util::pi()/20.0;
-
   // if no valid rotamer, truncate
   if ( nr < 0 || nr >= mm.protein_sidechain_number_of_rotamers() ) {
     clipper::MMonomer mm1;
     mm1.copy( mm, clipper::MM::COPY_MP );
     for ( int atm = 0; atm < mm.size(); atm++ ) {
       if ( mm[atm].name() == " N  " || mm[atm].name() == " CA " ||
-	   mm[atm].name() == " C  " || mm[atm].name() == " O  " )
+	   mm[atm].name() == " C  " || mm[atm].name() == " O  " ||
+	   mm[atm].name() == " CB " )
 	mm1.insert( mm[atm] );
     }
     mm = mm1;
@@ -30,15 +29,29 @@ void Ca_build::build_rotate_rotamer( clipper::MMonomer& mm, int nr, int nc )
   if ( nc == 0 ) return;
   int a = mm.lookup( " CA ", clipper::MM::ANY );
   int b = mm.lookup( " CB ", clipper::MM::ANY );
-  if ( a < 0 || b < 0 ) return;
-  const double dchi1 = dchi * double(nc);
-  const double c = cos(dchi1);
-  const double s = sin(dchi1);
+  int g = mm.lookup( " CG ", clipper::MM::ANY );
+  if ( a < 0 || b < 0 || g < 0 ) return;
+  const double dchis[25][2] =
+    { { 0.0, 0.0},{-1.0, 0.0},{ 1.0, 0.0},{-2.0, 0.0},{ 2.0, 0.0},
+      { 0.0,-1.0},{-1.0,-1.0},{ 1.0,-1.0},{-2.0,-1.0},{ 2.0,-1.0},
+      { 0.0, 1.0},{-1.0, 1.0},{ 1.0, 1.0},{-2.0, 1.0},{ 2.0, 1.0},
+      { 0.0,-2.0},{-1.0,-2.0},{ 1.0,-2.0},{-2.0,-2.0},{ 2.0,-2.0},
+      { 0.0, 2.0},{-1.0, 2.0},{ 1.0, 2.0},{-2.0, 2.0},{ 2.0, 2.0} };
+  const double dchi = clipper::Util::d2rad(9.0);
+  const double c1 = cos(dchi*dchis[nc][0]);
+  const double s1 = sin(dchi*dchis[nc][0]);
+  const double c2 = cos(dchi*dchis[nc][1]);
+  const double s2 = sin(dchi*dchis[nc][1]);
   const clipper::Coord_orth ca = mm[a].coord_orth();
   const clipper::Coord_orth cb = mm[b].coord_orth();
-  const clipper::Vec3<> axis = (cb-ca).unit();
-  const clipper::Rotation q( c, s*axis[0], s*axis[1], s*axis[2] );
-  const clipper::Mat33<> mat = q.matrix();
+  const clipper::Coord_orth cg = mm[g].coord_orth();
+  const clipper::Vec3<> axis1 = (cb-ca).unit();
+  const clipper::Vec3<> axis2 = clipper::Vec3<>::cross(cg-cb,axis1).unit();
+  const clipper::Rotation q1( c1, s1*axis1[0], s1*axis1[1], s1*axis1[2] );
+  const clipper::Mat33<> mat1 = q1.matrix();
+  const clipper::Rotation q2( c2, s2*axis2[0], s2*axis2[1], s2*axis2[2] );
+  const clipper::Mat33<> mat2 = q2.matrix();
+  const clipper::Mat33<> mat = mat1 * mat2;
   const clipper::RTop_orth rtop( mat, cb - mat*cb );
   for ( int atm = 0; atm < mm.size(); atm++ )
     if ( mm[atm].name() != " N  " && mm[atm].name() != " CA " &&
@@ -48,7 +61,7 @@ void Ca_build::build_rotate_rotamer( clipper::MMonomer& mm, int nr, int nc )
 }
 
 
-std::vector<std::pair<double,std::pair<int,int> > > Ca_build::score_rotamers( const clipper::MMonomer& mm, const clipper::Xmap<float>& xmap, const clipper::Map_stats& xstat )
+std::vector<std::pair<double,std::pair<int,int> > > Ca_build::score_rotamers( const clipper::MMonomer& mm, const clipper::Xmap<float>& xmap, const clipper::Map_stats& xstat, int nconf )
 {
   std::vector<std::pair<double,std::pair<int,int> > > result;
   int nr = mm.protein_sidechain_number_of_rotamers();
@@ -64,7 +77,7 @@ std::vector<std::pair<double,std::pair<int,int> > > Ca_build::score_rotamers( co
   mr.set_type( ProteinTools::residue_code_3( index ) );
   mr.protein_sidechain_build_rotamer( 0 );
   std::vector<int> atyp( mr.size(), -1 );
-  int nc = 0;
+  int maxtype = -1;
   for ( int atm = 0; atm < mr.size(); atm++ ) {
     const char& c = mr[atm].id()[2];
     if      ( c == 'G' ) atyp[atm] = 0;
@@ -72,15 +85,20 @@ std::vector<std::pair<double,std::pair<int,int> > > Ca_build::score_rotamers( co
     else if ( c == 'E' ) atyp[atm] = 2;
     else if ( c == 'Z' ) atyp[atm] = 3;
     else if ( c == 'H' ) atyp[atm] = 4;
-    if ( c == 'E' || c == 'Z' || c == 'H' ) nc = 2;
+    if ( atyp[atm] > maxtype ) maxtype = atyp[atm];
   }
+  int nc = 1;
+  if      ( maxtype == 1 ) nc = 1;
+  else if ( maxtype == 2 ) nc = 5;
+  else if ( maxtype >= 3 ) nc = 15;
+  if ( nc > nconf ) nc = nconf;
 
   // calculate density score, discarding Eta atoms
   double zwt = 2.0;  // EXPECTED Z-DIFF BETWEEN CORRECT AND RANDOM SCORES
   double wgts[] = { 1.0, 1.0, 1.0, 1.0, 0.0 };
   for ( int r = 0; r < nr; r++ ) {
     double p = mr.protein_sidechain_build_rotamer( 0 );
-    for ( int c = -nc; c <= nc; c++ ) {
+    for ( int c = 0; c < nc; c++ ) {
       build_rotate_rotamer( mr, r, c );
       double s = 0.0;
       double w = 0.0;
@@ -105,10 +123,13 @@ std::vector<std::pair<double,std::pair<int,int> > > Ca_build::score_rotamers( co
 }
 
 
-bool Ca_build::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap ) const
+bool Ca_build::build( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, clipper::String newrestype, bool flexible )
 {
   typedef clipper::MMonomer Mm;
   std::vector<std::pair<double,std::pair<int,int> > > scrs;
+
+  // how much can we flex the rotamer?
+  int nconf = flexible ? 15 : 5;
 
   // get map stats
   clipper::Map_stats xstat( xmap );
@@ -122,11 +143,11 @@ bool Ca_build::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& x
       if ( ProteinTools::residue_index_3( oldrestype ) < 0 )
 	mol[chn][res].set_type( newrestype );
       // get rotamer scores
-      scrs = score_rotamers( mol[chn][res], xmap, xstat );
+      scrs = score_rotamers( mol[chn][res], xmap, xstat, nconf );
       std::sort( scrs.begin(), scrs.end() );
       // build best
       build_rotate_rotamer( mol[chn][res], scrs[0].second.first,
-			                   scrs[0].second.second );
+                                           scrs[0].second.second );
       // restore name
       mol[chn][res].set_type( oldrestype );
     }
@@ -138,13 +159,19 @@ bool Ca_build::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& x
   }
 
   // fix clashes
-  fix_clashes( mol, xmap, xstat );
+  fix_clashes( mol, xmap, xstat, newrestype );
 
   return true;
 }
 
 
-std::vector<Ca_build::Clash> Ca_build::find_clashes( const clipper::MiniMol& mol, const double& d ) const
+bool Ca_build::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap ) const
+{
+  return build( mol, xmap, newrestype_, flexible_ );
+}
+
+
+std::vector<Ca_build::Clash> Ca_build::find_clashes( const clipper::MiniMol& mol, const double& d )
 {
   // now search for any clashes
   const clipper::Spacegroup& spgr = mol.spacegroup();
@@ -165,8 +192,7 @@ std::vector<Ca_build::Clash> Ca_build::find_clashes( const clipper::MiniMol& mol
 	atoms = nb( o1, 8.0 );
 	catoms.resize( atoms.size() );
 	for ( int i = 0; i < atoms.size(); i++ ) {
-	  o2 = mol[atoms[i].polymer()][atoms[i].monomer()][atoms[i].atom()]
-	    .coord_orth();
+	  o2 = mol.atom(atoms[i]).coord_orth();
 	  f2 = o2.coord_frac( cell );
 	  f2 = spgr.symop(atoms[i].symmetry()) * f2;
 	  f2 = f2.lattice_copy_near( f1 );
@@ -209,7 +235,7 @@ std::vector<Ca_build::Clash> Ca_build::find_clashes( const clipper::MiniMol& mol
 }
 
 
-void Ca_build::fix_clash  ( clipper::MMonomer& m1, clipper::MMonomer& m2, const clipper::Xmap<float>& xmap, const clipper::Map_stats& xstat, const double& d ) const
+void Ca_build::fix_clash  ( clipper::MMonomer& m1, clipper::MMonomer& m2, const clipper::Xmap<float>& xmap, const clipper::Map_stats& xstat, const double& d, clipper::String newrestype )
 {
   // useful data
   const clipper::Spacegroup& spgr = xmap.spacegroup();
@@ -235,8 +261,8 @@ void Ca_build::fix_clash  ( clipper::MMonomer& m1, clipper::MMonomer& m2, const 
   }
   // fetch the rotamer scores
   std::vector<std::pair<double,std::pair<int,int> > > scr1, scr2;
-  scr1 = score_rotamers( mm1, xmap, xstat );
-  scr2 = score_rotamers( mm2, xmap, xstat );
+  scr1 = score_rotamers( mm1, xmap, xstat, 5 );
+  scr2 = score_rotamers( mm2, xmap, xstat, 5 );
   // now search over orientations
   double smin = 1.0e9;
   int r1min, r2min;
@@ -279,7 +305,7 @@ void Ca_build::fix_clash  ( clipper::MMonomer& m1, clipper::MMonomer& m2, const 
 }
 
 
-void Ca_build::fix_clashes( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const clipper::Map_stats& xstat ) const
+void Ca_build::fix_clashes( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const clipper::Map_stats& xstat, clipper::String newrestype )
 {
   std::vector<Clash> clashes;
   const double d = 1.25;
@@ -290,32 +316,14 @@ void Ca_build::fix_clashes( clipper::MiniMol& mol, const clipper::Xmap<float>& x
   // and try and fix them
   for ( int i = 0; i < clashes.size(); i++ )
     fix_clash( mol[clashes[i].p1][clashes[i].m1],
-	       mol[clashes[i].p2][clashes[i].m2], xmap, xstat, d );
+	       mol[clashes[i].p2][clashes[i].m2], xmap, xstat, d, newrestype );
 
   // check for any remaining clashes
   clashes = find_clashes( mol, d );
 
   // and delete the offending atoms
   for ( int i = 0; i < clashes.size(); i++ ) {
-    {
-      clipper::MMonomer mm1, mm2;
-      mm1 = mol[clashes[i].p1][clashes[i].m1];
-      mm2.copy( mm1, clipper::MM::COPY_MP );
-      for ( int atm = 0; atm < mm1.size(); atm++ )
-	if ( mm1[atm].name() == " N  " || mm1[atm].name() == " CA " ||
-	     mm1[atm].name() == " C  " || mm1[atm].name() == " O  " ||
-	     mm1[atm].name() == " CB " ) mm2.insert( mm1[atm] );
-      mol[clashes[i].p1][clashes[i].m1] = mm2;
-    }
-    {
-      clipper::MMonomer mm1, mm2;
-      mm1 = mol[clashes[i].p2][clashes[i].m2];
-      mm2.copy( mm1, clipper::MM::COPY_MP );
-      for ( int atm = 0; atm < mm1.size(); atm++ )
-	if ( mm1[atm].name() == " N  " || mm1[atm].name() == " CA " ||
-	     mm1[atm].name() == " C  " || mm1[atm].name() == " O  " ||
-	     mm1[atm].name() == " CB " ) mm2.insert( mm1[atm] );
-      mol[clashes[i].p2][clashes[i].m2] = mm2;
-    }
+    build_rotate_rotamer( mol[clashes[i].p1][clashes[i].m1], -1, -1 );
+    build_rotate_rotamer( mol[clashes[i].p2][clashes[i].m2], -1, -1 );
   }
 }

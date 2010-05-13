@@ -422,8 +422,7 @@ Score_list<clipper::String> Ca_sequence::sequence_chain( clipper::MChain& chain,
 	atoms = nb.atoms_near( co, nb_rad );
 	cf1 = co.coord_frac( molprior.cell() );
 	for ( int i = 0; i < atoms.size(); i++ ) {
-	  const clipper::MAtom& atom =
-	    molprior[atoms[i].polymer()][atoms[i].monomer()][atoms[i].atom()];
+	  const clipper::MAtom& atom = molprior.atom(atoms[i]);
 	  cf2 = atom.coord_orth().coord_frac( molprior.cell() );
 	  cf2 = molprior.spacegroup().symop( atoms[i].symmetry() ) * cf2;
 	  cf2 = cf2.lattice_copy_near( cf1 );

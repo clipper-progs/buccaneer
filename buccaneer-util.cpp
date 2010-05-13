@@ -2,6 +2,7 @@
 /* (C) 2002-2008 Kevin Cowtan & University of York all rights reserved */
 
 #include "buccaneer-util.h"
+#include "buccaneer-prot.h"
 
 #include <fstream>
 extern "C" {
@@ -9,7 +10,7 @@ extern "C" {
 }
 
 
-void Buccaneer_util::set_reference( clipper::String& mtz, clipper::String& pdb )
+void BuccaneerUtil::set_reference( clipper::String& mtz, clipper::String& pdb )
 {
   const char* clibdptr = getenv( "CLIBD" );
   if ( clibdptr != NULL ) {
@@ -44,9 +45,40 @@ void Buccaneer_util::set_reference( clipper::String& mtz, clipper::String& pdb )
 }
 
 
+void BuccaneerUtil::read_model( clipper::MiniMol& mol, clipper::String file, bool verbose )
+{
+  const int mmdbflags = ( MMDBF_IgnoreBlankLines |
+			  MMDBF_IgnoreDuplSeqNum |
+			  MMDBF_IgnoreNonCoorPDBErrors |
+			  MMDBF_IgnoreRemarks );
+  clipper::MMDBfile mmdb;
+  mmdb.SetFlag( mmdbflags );
+  if ( file != "NONE" ) {
+    std::vector<clipper::String> files = file.split(",");
+    for ( int f = 0; f < files.size(); f++ ) {
+      try {
+	clipper::MiniMol moltmp;
+	mmdb.read_file( files[f] );
+	mmdb.import_minimol( moltmp );
+	std::cout << "Read PDB file: " << files[f] << std::endl;
+	for ( int c = 0; c < moltmp.size(); c++ )
+	  if ( moltmp[c].id() != "!" ) mol.insert( moltmp[c] );	
+	if ( verbose ) {
+	  clipper::Atom_list atoms = moltmp.atom_list();
+	  std::cout << "Number of atoms read: " << atoms.size() << std::endl;
+	  for ( int i = 0; i < atoms.size(); i += atoms.size()-1 ) printf("%i6  %4s  %8.3f %8.3f %8.3f\n", i, atoms[i].element().c_str(), atoms[i].coord_orth().x(), atoms[i].coord_orth().y(), atoms[i].coord_orth().z() );
+	}
+      } catch ( clipper::Message_fatal ) {
+	std::cout << "FAILED TO READ PDB FILE: " << file << std::endl;
+      }
+    }
+  }
+}
+
+
 #ifdef BUCCANEER_PROFILE
 #include <sys/times.h>
-void Buccaneer_log::log( const clipper::String& id )
+void BuccaneerLog::log( const clipper::String& id )
 {
   int i;
   tms tmst;
@@ -65,11 +97,11 @@ void Buccaneer_log::log( const clipper::String& id )
   currentcpu = cpu;
 }
 #else
-void Buccaneer_log::log( const clipper::String& id ) {}
+void BuccaneerLog::log( const clipper::String& id ) {}
 #endif
 
 
-void Buccaneer_log::log( const clipper::String& id, const clipper::MiniMol& mol, bool view )
+void BuccaneerLog::log( const clipper::String& id, const clipper::MiniMol& mol, bool view )
 {
   if ( view ) {
     for ( int c = 0; c < mol.size(); c++ )
@@ -104,7 +136,33 @@ void Buccaneer_log::log( const clipper::String& id, const clipper::MiniMol& mol,
 }
 
 
-void Buccaneer_log::profile()
+void BuccaneerLog::xml( const clipper::String& file, const clipper::MiniMol& mol )
+{
+  int nres, nseq, nchn, nmax;
+  nchn = mol.size();
+  nres = nseq = nmax = 0;
+  for ( int c = 0; c < mol.size(); c++ ) {
+    if ( mol[c].size() > nmax ) nmax = mol[c].size();
+    for ( int r = 0; r < mol[c].size(); r++ ) {
+      if ( mol[c][r].lookup( " CA ", clipper::MM::ANY ) >= 0 ) nres++;
+      if ( ProteinTools::residue_index_3( mol[c][r].type() ) >= 0 ) nseq++;
+    }
+  }
+
+  std::ofstream f;
+  f.open( file.c_str(), std::ios::out );
+  f << "<BuccaneerResult>" << std::endl;
+  f << "<ChainsBuilt>" << nchn << "</ChainsBuilt>" << std::endl;
+  f << "<ResiduesBuilt>" << nres << "</ResiduesBuilt>" << std::endl;
+  f << "<ResiduesSequenced>" << nseq << "</ResiduesSequenced>" << std::endl;
+  f << "<ResiduesLongestChain>" << nmax << "</ResiduesLongestChain>" << std::endl;
+  f << "</BuccaneerResult>" << std::endl;
+  f.close();
+
+}
+
+
+void BuccaneerLog::profile()
 {
   if ( prof.size() > 0 ) {
     std::cout << std::endl << "Profile:" << std::endl;

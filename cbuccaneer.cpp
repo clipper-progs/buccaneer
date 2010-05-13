@@ -15,18 +15,20 @@
 #include "buccaneer-ncsbuild.h"
 #include "buccaneer-prune.h"
 #include "buccaneer-build.h"
-#include "buccaneer-mr.h"
+#include "buccaneer-merge.h"
+#include "buccaneer-known.h"
 #include "buccaneer-util.h"
 
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.3.0", "$Date: 2009/06/01" );
+  CCP4Program prog( "cbuccaneer", "1.4.0", "$Date: 2010/04/14" );
   prog.set_termination_message( "Failed" );
 
-  std::cout << std::endl << "Copyright 2002-2008 Kevin Cowtan and University of York." << std::endl << std::endl;
+  std::cout << std::endl << "Copyright 2002-2010 Kevin Cowtan and University of York." << std::endl << std::endl;
   prog.summary_beg();
-  std::cout << "$TEXT:Reference: $$ Please reference $$" << std::endl << std::endl << " 'The Buccaneer software for automated model building'" << std::endl << " Cowtan K. (2006) Acta Cryst. D62, 1002-1011." << std::endl << std::endl << "$$";
+  std::cout << "$TEXT:Reference: $$ Please reference $$" << std::endl << std::endl << " 'Fitting molecular fragments into electron density'" << std::endl << " Cowtan K. (2008) Acta Cryst. D64, 83-89." << std::endl << std::endl << "$$" << std::endl;
+  std::cout << "$TEXT:Reference: $$ Please reference $$" << std::endl << std::endl << " 'The Buccaneer software for automated model building'" << std::endl << " Cowtan K. (2006) Acta Cryst. D62, 1002-1011." << std::endl << std::endl << "$$" << std::endl;
   prog.summary_end();
 
   // defaults
@@ -37,7 +39,6 @@ int main( int argc, char** argv )
   clipper::String ippdb_wrk = "NONE";
   clipper::String ipseq_wrk = "NONE";
   clipper::String ippdb_seq = "NONE";
-  clipper::String ippdb_mr  = "NONE";
   clipper::String ipcol_ref_fo = "/*/*/FP";
   clipper::String ipcol_ref_hl = "/*/*/FC";
   clipper::String ipcol_wrk_fo = "NONE";
@@ -47,13 +48,16 @@ int main( int argc, char** argv )
   clipper::String ipcol_wrk_fr = "NONE";
   clipper::String oppdb = "buccaneer.pdb";
   clipper::String opmap = "NONE";
+  clipper::String opxml = "NONE";
   clipper::String newresname = "UNK";
   clipper::String newrestype = "ALA";
   double res_in = 1.0;         // Resolution limit
-  int nfrag  = 500;
-  int nfragr = 20;
   int ncyc = 3;
   int ncpu = 0;
+  int nfrag  = 500;
+  int nfragr = 20;
+  int modelindex = 0;
+  bool merge = false;  // multimodel merge
   bool find  = false;  // calculation steps
   bool grow  = false;
   bool join  = false;
@@ -75,7 +79,7 @@ int main( int argc, char** argv )
   double moffset = 0.0;
   bool correl = false;
   Ca_prep::Rama_flt rama_flt = Ca_prep::rama_flt_all;
-  unsigned int passthru = 0;
+  std::vector<std::pair<clipper::String,double> > known_ids;
   int verbose = 0;
 
   // command input
@@ -95,8 +99,6 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) ipseq_wrk = args[arg];
     } else if ( key == "-pdbin"        || key == "-pdbin-wrk" ) {
       if ( ++arg < args.size() ) ippdb_wrk = args[arg];
-    } else if ( key == "-pdbin-mr"     || key == "-pdbin-wrk-mr" ) {
-      if ( ++arg < args.size() ) ippdb_mr  = args[arg];
     } else if ( key == "-pdbin-sequence-prior" || key == "-pdbin-wrk-sequence-prior" ) {
       if ( ++arg < args.size() ) ippdb_seq = args[arg];
     } else if ( key == "-pdbout"      || key == "-pdbout-wrk" ) {
@@ -121,6 +123,8 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) res_in = clipper::String(args[arg]).f();
     } else if ( key == "-cycles" ) {
       if ( ++arg < args.size() ) ncyc  = clipper::String(args[arg]).i();
+    } else if ( key == "-merge" ) {
+      merge = true;
     } else if ( key == "-find" ) {
       find = true;
     } else if ( key == "-grow" ) {
@@ -155,6 +159,8 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) nfrag  = clipper::String(args[arg]).i();
     } else if ( key == "-fragments-per-100-residues" ) {
       if ( ++arg < args.size() ) nfragr = clipper::String(args[arg]).i();
+    } else if ( key == "-model-index" ) {
+      if ( ++arg < args.size() ) modelindex = clipper::String(args[arg]).i();
     } else if ( key == "-ramachandran-filter" ) {
       if ( ++arg < args.size() ) {
 	if ( args[arg] == "all"      ) rama_flt = Ca_prep::rama_flt_all;
@@ -162,15 +168,9 @@ int main( int argc, char** argv )
 	if ( args[arg] == "strand"   ) rama_flt = Ca_prep::rama_flt_strand;
 	if ( args[arg] == "nonhelix" ) rama_flt = Ca_prep::rama_flt_nonhelix;
       }
-    } else if ( key == "-pass-through" ) {
-      if ( ++arg < args.size() ) {
-	std::vector<clipper::String> s=clipper::String(args[arg]).split(",");
-	for ( int t = 0; t < s.size(); t++ ) {
-	  if ( s[t] == "nonprotein"  ) passthru |= ProteinTools::NONPROTEIN;
-	  if ( s[t] == "substructure") passthru |= ProteinTools::SUBSTRUCTURE;
-	  if ( s[t] == "solvent"     ) passthru |= ProteinTools::SOLVENT;
-	}
-      }
+    } else if ( key == "-known-structure" ) {
+      if ( ++arg < args.size() )
+	known_ids.push_back( KnownStructure::parse(args[arg] ) );
     } else if ( key == "-main-chain-likelihood-radius" ) {
       if ( ++arg < args.size() ) main_tgt_rad = clipper::String(args[arg]).f();
     } else if ( key == "-side-chain-likelihood-radius" ) {
@@ -195,7 +195,7 @@ int main( int argc, char** argv )
     }
   }
   if ( args.size() <= 1 ) {
-    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-pass-through <type[,type]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input model is extended.\n";
+    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-known-structure <atomid[,radius]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input model is extended.\n";
     exit(1);
   }
 
@@ -228,8 +228,8 @@ int main( int argc, char** argv )
   if ( !(find||grow||join||link||seqnc||corct||filtr||ncsbd||prune||build) )
     find=grow=join=link=seqnc=corct=filtr=ncsbd=prune=build=true;
   if ( ipmtz_ref == "NONE" || ippdb_ref == "NONE" )
-    Buccaneer_util::set_reference( ipmtz_ref, ippdb_ref );
-  Buccaneer_log log;
+    BuccaneerUtil::set_reference( ipmtz_ref, ippdb_ref );
+  BuccaneerLog log;
 
   // Get resolution for calculation
   mtzfile.open_read( ipmtz_ref );
@@ -282,7 +282,7 @@ int main( int argc, char** argv )
     if ( ipcol_wrk_fc != "NONE" ) wrk_fp.compute( wrk_fp, compute_aniso );    
     // output
     std::cout << std::endl << "Applying anisotropy correction:"
-	      << std::endl << uaniso.format() << std::endl;
+	      << std::endl << uaniso.format() << std::endl << std::endl;
   }
 
   // apply free flag
@@ -296,41 +296,22 @@ int main( int argc, char** argv )
   // Get reference model
   clipper::Spacegroup cspg = hkls_wrk.spacegroup();
   clipper::MiniMol mol_ref, mol_wrk_in, mol_tmp;
-  clipper::MiniMol mol_wrk(cspg,cxtl), mol_mr(cspg,cxtl), mol_seq(cspg,cxtl);
+  clipper::MiniMol mol_wrk(cspg,cxtl), mol_seq(cspg,cxtl);
   clipper::MMDBfile mmdb_ref;
   mmdb_ref.SetFlag( mmdbflags );
   mmdb_ref.read_file( ippdb_ref );
   mmdb_ref.import_minimol( mol_ref );
 
   // Get work model (optional)
-  if ( ippdb_wrk != "NONE" ) {
-    clipper::MMDBfile mmdb_wrk;
-    mmdb_wrk.SetFlag( mmdbflags );
-    mmdb_wrk.read_file( ippdb_wrk );
-    mmdb_wrk.import_minimol( mol_tmp );
-    for ( int c = 0; c < mol_tmp.size(); c++ )
-      if ( mol_tmp[c].id() != "!" ) mol_wrk.insert( mol_tmp[c] );
-  }
-  // Get MR model
-  if ( ippdb_mr  != "NONE" ) {
-    clipper::MMDBfile mmdb_wrk;
-    mmdb_wrk.SetFlag( mmdbflags );
-    mmdb_wrk.read_file( ippdb_mr );
-    mmdb_wrk.import_minimol( mol_tmp );
-    mol_mr.copy( mol_tmp, clipper::MM::COPY_MPC );
-  }
+  BuccaneerUtil::read_model( mol_wrk, ippdb_wrk, verbose>5 );
   // Get sequencing model - heavy atoms or MR (optional)
-  if ( ippdb_seq != "NONE" ) {
-    clipper::MMDBfile mmdb_wrk;
-    mmdb_wrk.SetFlag( mmdbflags );
-    mmdb_wrk.read_file( ippdb_seq );
-    mmdb_wrk.import_minimol( mol_tmp );
-    mol_seq.copy( mol_tmp, clipper::MM::COPY_MPC );
-    Ca_sequence::set_prior_model( mol_seq );
-    log.log( "", mol_seq, verbose>9 );
-  }
+  BuccaneerUtil::read_model( mol_seq, ippdb_seq, verbose>5 );
+  if ( mol_seq.size() > 0 ) Ca_sequence::set_prior_model( mol_seq );
   // store a copy of the input model
   mol_wrk_in = mol_wrk;
+  // store known structure info
+  KnownStructure knownstruc( mol_wrk_in, known_ids );
+  if ( verbose >= 1 ) knownstruc.debug();
 
   // Get work sequence (optional)
   clipper::MMoleculeSequence seq_wrk;
@@ -414,8 +395,16 @@ int main( int argc, char** argv )
     // tidy input model
     ProteinTools::chain_tidy( mol_wrk );
 
-    // and sequence chain fragments
+    // prepare search target
     Ca_find cafind( nfrag, resol.limit() );
+
+    // merge multi-model results
+    if ( merge ) {
+      Ca_merge camerge( seq_rel );
+      camerge( mol_wrk, xwrk, llkcls, seq_wrk );
+      std::cout << " C-alphas after model merge:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+      log.log( "MRG ", mol_wrk, verbose>9 );
+    }
 
     // model building loop
     for ( int cyc = 0; cyc < ncyc; cyc++ ) {
@@ -424,7 +413,7 @@ int main( int argc, char** argv )
 
       // find C-alphas by slow likelihood search
       if ( find ) {
-	cafind( mol_wrk, xwrk, llktgt, findtype );
+	cafind( mol_wrk, xwrk, llktgt, findtype, modelindex );
 	std::cout << " C-alphas after finding:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
 	log.log( "FIND", mol_wrk, verbose>9 );
       }
@@ -486,7 +475,7 @@ int main( int argc, char** argv )
 	log.log( "NCSB", mol_wrk, verbose>9 );
       }
 
-      // prune C-alphas
+      // prune C-alphas for clashes with other chains and known model
       if ( prune ) {
 	Ca_prune caprune( 3.0 );
 	caprune( mol_wrk );
@@ -503,7 +492,9 @@ int main( int argc, char** argv )
       }
 
       // tidy output model
+      knownstruc.prune( mol_wrk );
       ProteinTools::chain_tidy( mol_wrk );
+      ProteinTools::chain_label( mol_wrk, knownstruc.chain_ids() );
 
       // user output
       std::cout << std::endl;
@@ -552,12 +543,8 @@ int main( int argc, char** argv )
     for ( int c = 0; c < mol_wrk.size(); c++ )
       if ( c < 26 ) ProteinTools::chain_renumber( mol_wrk[c], seq_wrk );
 
-    // add chains from MR model and from input model
-    Ca_mr camr( 2.0 );
-    if ( ippdb_mr != "NONE" )
-      camr( mol_wrk, mol_mr );
-    if ( passthru )
-      ProteinTools::copy_other_atoms( mol_wrk, mol_wrk_in, passthru );
+    // add known structure from input model
+    knownstruc.copy_to( mol_wrk );
 
     // write answers
     clipper::MMDBfile mmdb;
@@ -565,6 +552,7 @@ int main( int argc, char** argv )
     mmdb.write_file( oppdb );
   }
 
+  if ( opxml != "NONE" ) log.xml( opxml, mol_wrk );
   std::cout << "$TEXT:Result: $$ $$" << std::endl << msg << "$$" << std::endl;
   log.profile();
   prog.set_termination_message( "Normal termination" );
