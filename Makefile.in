@@ -125,7 +125,8 @@ buccaneer-find.h       buccaneer-prep.cpp      simplex-lib.cpp \
 buccaneer-grow.cpp     buccaneer-prep.h        simplex-lib.h \
 buccaneer-grow.h       buccaneer-prot.cpp      simulate-lib.cpp \
 buccaneer-join.cpp     buccaneer-prot.h        simulate-lib.h \
-buccaneer-mr.cpp       buccaneer-mr.h
+buccaneer-known.cpp    buccaneer-known.h       buccaneer-merge.cpp \
+buccaneer-merge.h
 
 
 csequins_SOURCES = \
@@ -153,7 +154,7 @@ am_cbuccaneer_OBJECTS = buccaneer-build.$(OBJEXT) \
 	buccaneer-prep.$(OBJEXT) simplex-lib.$(OBJEXT) \
 	buccaneer-grow.$(OBJEXT) buccaneer-prot.$(OBJEXT) \
 	simulate-lib.$(OBJEXT) buccaneer-join.$(OBJEXT) \
-	buccaneer-mr.$(OBJEXT)
+	buccaneer-known.$(OBJEXT) buccaneer-merge.$(OBJEXT)
 cbuccaneer_OBJECTS = $(am_cbuccaneer_OBJECTS)
 cbuccaneer_LDADD = $(LDADD)
 cbuccaneer_DEPENDENCIES =
@@ -176,9 +177,10 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-find.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-grow.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-join.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/buccaneer-known.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-lib.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-link.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/buccaneer-mr.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/buccaneer-merge.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-ncsbuild.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prep.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prot.Po \
@@ -255,9 +257,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-find.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-grow.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-join.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-known.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-lib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-link.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-mr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-merge.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-ncsbuild.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prep.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prot.Po@am__quote@
