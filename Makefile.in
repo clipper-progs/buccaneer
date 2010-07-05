@@ -126,7 +126,7 @@ buccaneer-grow.cpp     buccaneer-prep.h        simplex-lib.h \
 buccaneer-grow.h       buccaneer-prot.cpp      simulate-lib.cpp \
 buccaneer-join.cpp     buccaneer-prot.h        simulate-lib.h \
 buccaneer-known.cpp    buccaneer-known.h       buccaneer-merge.cpp \
-buccaneer-merge.h
+buccaneer-merge.h      buccaneer-tidy.cpp      buccaneer-tidy.h
 
 
 csequins_SOURCES = \
@@ -154,7 +154,8 @@ am_cbuccaneer_OBJECTS = buccaneer-build.$(OBJEXT) \
 	buccaneer-prep.$(OBJEXT) simplex-lib.$(OBJEXT) \
 	buccaneer-grow.$(OBJEXT) buccaneer-prot.$(OBJEXT) \
 	simulate-lib.$(OBJEXT) buccaneer-join.$(OBJEXT) \
-	buccaneer-known.$(OBJEXT) buccaneer-merge.$(OBJEXT)
+	buccaneer-known.$(OBJEXT) buccaneer-merge.$(OBJEXT) \
+	buccaneer-tidy.$(OBJEXT)
 cbuccaneer_OBJECTS = $(am_cbuccaneer_OBJECTS)
 cbuccaneer_LDADD = $(LDADD)
 cbuccaneer_DEPENDENCIES =
@@ -186,6 +187,7 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prot.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-prune.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-sequence.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/buccaneer-tidy.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/buccaneer-util.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/cbuccaneer.Po ./$(DEPDIR)/csequins.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/simplex-lib.Po \
@@ -266,6 +268,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prot.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-prune.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-sequence.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-tidy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buccaneer-util.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cbuccaneer.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/csequins.Po@am__quote@
