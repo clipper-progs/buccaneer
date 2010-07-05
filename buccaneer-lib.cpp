@@ -5,6 +5,8 @@
 
 #include <clipper/clipper-contrib.h>
 
+#include <algorithm>
+
 
 /*! The target is constructed and initialised to zero. It can then be
   filled by accumulation or by loading the target and weight.
@@ -65,7 +67,7 @@ void LLK_map_target::prep_llk()
       if ( mrho2[ix] > 0.0 ) {
 	mrho[ix]  /= naccum;  // local density stats
 	mrho2[ix] /= naccum;  // limit std to no less than 3% of map std
-	mrho2[ix] = sqrt( clipper::Util::max( mrho2[ix] - mrho[ix]*mrho[ix],
+	mrho2[ix] = sqrt( std::max( mrho2[ix] - mrho[ix]*mrho[ix],
 					      0.001f*smap*smap ) );
       }
     // convert density moments to llk target
@@ -76,8 +78,8 @@ void LLK_map_target::prep_llk()
 	std = mrho2[ix];
 	v1 = std*std;
 	v2 = smap*smap;
-	w1 = clipper::Util::max( v2/v1-1.0, 0.001 );  // weight must be +ve
-	w2 = clipper::Util::min( 1.0/w1, 2.0 );  // limit density upweighting
+	w1 = std::max( v2/v1-1.0, 0.001 );  // weight must be +ve
+	w2 = std::min( 1.0/w1, 2.0 );  // limit density upweighting
 	target[ix] = rho + w2*(rho-rmap);
 	weight[ix] = w1 * 0.5/v2;
       }
@@ -168,7 +170,7 @@ std::vector<clipper::RTop_orth> LLK_map_target::rtop_list( const clipper::Spaceg
        spgr.order_of_symmetry_about_axis( clipper::Spacegroup::B ) % 2 == 0 )
     blim /= 2.0;
   // do a uniformly sampled search of orientation space
-  float anglim = clipper::Util::min( alim, glim );
+  float anglim = std::min( alim, glim );
   for ( float bdeg=step/2; bdeg < 180.0; bdeg += step ) {
     float beta = clipper::Util::d2rad(bdeg);
     float spl = anglim/clipper::Util::intf(cos(0.5*beta)*anglim/step+1);
@@ -331,7 +333,7 @@ clipper::ftype LLK_map_target::Sampled::correl( const clipper::Xmap<float>& xmap
     swyy += w * y * y;
     swxy += w * x * y;
   }
-  return -( sw*swxy - swx*swy ) / sqrt( clipper::Util::max(
+  return -( sw*swxy - swx*swy ) / sqrt( std::max(
       ( sw*swxx - swx*swx ) * ( sw*swyy - swy*swy ), 1.0e-20 ) );
 }
 

@@ -15,10 +15,8 @@ class KnownStructure {
   //! Constructor: from model and arguments
   KnownStructure( const clipper::MiniMol& mol,
 		  const std::vector<std::pair<clipper::String,double> >& ids );
-  //! Return chain ids used by known structure elements
-  clipper::String chain_ids() const;
   //! Add known structure to existing structure
-  void copy_to( clipper::MiniMol& mol ) const;
+  bool copy_to( clipper::MiniMol& mol ) const;
   //! check for clashes against known model
   bool clash( const clipper::Coord_orth& coord ) const;
   //! prune model where it clashes with known model

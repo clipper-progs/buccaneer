@@ -17,12 +17,17 @@
 #include "buccaneer-build.h"
 #include "buccaneer-merge.h"
 #include "buccaneer-known.h"
+#include "buccaneer-tidy.h"
 #include "buccaneer-util.h"
+
+extern "C" {
+  #include <stdlib.h>
+}
 
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.4.0", "$Date: 2010/04/14" );
+  CCP4Program prog( "cbuccaneer", "1.5.0", "$Date: 2010/05/28" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2010 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -37,8 +42,9 @@ int main( int argc, char** argv )
   clipper::String ipmtz_wrk = "NONE";
   clipper::String ippdb_ref = "NONE";
   clipper::String ippdb_wrk = "NONE";
-  clipper::String ipseq_wrk = "NONE";
+  clipper::String ippdb_mr  = "NONE";
   clipper::String ippdb_seq = "NONE";
+  clipper::String ipseq_wrk = "NONE";
   clipper::String ipcol_ref_fo = "/*/*/FP";
   clipper::String ipcol_ref_hl = "/*/*/FC";
   clipper::String ipcol_wrk_fo = "NONE";
@@ -99,6 +105,8 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) ipseq_wrk = args[arg];
     } else if ( key == "-pdbin"        || key == "-pdbin-wrk" ) {
       if ( ++arg < args.size() ) ippdb_wrk = args[arg];
+    } else if ( key == "-pdbin-mr"     || key == "-pdbin-wrk-mr" ) {
+      if ( ++arg < args.size() ) ippdb_mr  = args[arg];
     } else if ( key == "-pdbin-sequence-prior" || key == "-pdbin-wrk-sequence-prior" ) {
       if ( ++arg < args.size() ) ippdb_seq = args[arg];
     } else if ( key == "-pdbout"      || key == "-pdbout-wrk" ) {
@@ -233,12 +241,12 @@ int main( int argc, char** argv )
 
   // Get resolution for calculation
   mtzfile.open_read( ipmtz_ref );
-  double res_ref = clipper::Util::max( mtzfile.resolution().limit(), res_in );
+  double res_ref = std::max( mtzfile.resolution().limit(), res_in );
   mtzfile.close_read();
   mtzfile.open_read( ipmtz_wrk );
-  double res_wrk = clipper::Util::max( mtzfile.resolution().limit(), res_in );
+  double res_wrk = std::max( mtzfile.resolution().limit(), res_in );
   mtzfile.close_read();
-  resol = clipper::Resolution( clipper::Util::max( res_ref, res_wrk ) );
+  resol = clipper::Resolution( std::max( res_ref, res_wrk ) );
   if ( res_ref > res_wrk ) std::cout << "\nWARNING: resolution of work structure truncated to reference:\n Ref: " << res_ref << " Wrk: " << res_wrk << std::endl;
 
   // Get reference reflection data
@@ -296,7 +304,7 @@ int main( int argc, char** argv )
   // Get reference model
   clipper::Spacegroup cspg = hkls_wrk.spacegroup();
   clipper::MiniMol mol_ref, mol_wrk_in, mol_tmp;
-  clipper::MiniMol mol_wrk(cspg,cxtl), mol_seq(cspg,cxtl);
+  clipper::MiniMol mol_wrk(cspg,cxtl), mol_mr(cspg,cxtl), mol_seq(cspg,cxtl);
   clipper::MMDBfile mmdb_ref;
   mmdb_ref.SetFlag( mmdbflags );
   mmdb_ref.read_file( ippdb_ref );
@@ -304,6 +312,8 @@ int main( int argc, char** argv )
 
   // Get work model (optional)
   BuccaneerUtil::read_model( mol_wrk, ippdb_wrk, verbose>5 );
+  // Get MR model - to help rebuilding
+  BuccaneerUtil::read_model( mol_mr,  ippdb_mr,  verbose>5 );
   // Get sequencing model - heavy atoms or MR (optional)
   BuccaneerUtil::read_model( mol_seq, ippdb_seq, verbose>5 );
   if ( mol_seq.size() > 0 ) Ca_sequence::set_prior_model( mol_seq );
@@ -381,7 +391,7 @@ int main( int argc, char** argv )
     // number of residues to find
     double vol = xwrk.cell().volume() / double(xwrk.spacegroup().num_symops());
     int nres   = int( vol / 320.0 );  // 320A^3/residue on average (inc solvent)
-    nfrag = clipper::Util::min( nfrag, (nfragr*nres)/100 );
+    nfrag = std::min( nfrag, (nfragr*nres)/100 );
 
     // offset the map density
     clipper::Map_stats stats( xwrk );
@@ -393,7 +403,7 @@ int main( int argc, char** argv )
     llktgt.prep_llk_distribution( xwrk );
 
     // tidy input model
-    ProteinTools::chain_tidy( mol_wrk );
+    ProteinTools::split_chains_at_gap( mol_wrk );
 
     // prepare search target
     Ca_find cafind( nfrag, resol.limit() );
@@ -493,8 +503,9 @@ int main( int argc, char** argv )
 
       // tidy output model
       knownstruc.prune( mol_wrk );
-      ProteinTools::chain_tidy( mol_wrk );
-      ProteinTools::chain_label( mol_wrk, knownstruc.chain_ids() );
+      ProteinTools::split_chains_at_gap( mol_wrk );
+      ProteinTools::chain_number( mol_wrk );
+      ProteinTools::chain_label( mol_wrk );
 
       // user output
       std::cout << std::endl;
@@ -539,12 +550,15 @@ int main( int argc, char** argv )
 	  if ( ProteinTools::residue_index_3( mol_wrk[c][r].type() ) < 0 )
 	    mol_wrk[c][r].set_type( newresname );
 
-    // adjust residue numbers
-    for ( int c = 0; c < mol_wrk.size(); c++ )
-      if ( c < 26 ) ProteinTools::chain_renumber( mol_wrk[c], seq_wrk );
-
+    // model tidy
+    ModelTidy mtidy;
+    bool tidy = mtidy.tidy( mol_wrk, mol_mr, seq_wrk );
+    if ( !tidy ) std::cout << "ModelTidy error" << std::endl; // can't happen
     // add known structure from input model
-    knownstruc.copy_to( mol_wrk );
+    bool copy = knownstruc.copy_to( mol_wrk );
+    if ( !copy ) std::cout << std::cout << "$TEXT:Warning: $$ $$\nWARNING: chain ID clash between known-structure and pdbin-mr. Chains renamed.\n$$" << std::endl;
+    // label unlabelled chains
+    ProteinTools::chain_label( mol_wrk );
 
     // write answers
     clipper::MMDBfile mmdb;

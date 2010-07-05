@@ -5,6 +5,8 @@
 
 #include <clipper/clipper-contrib.h>
 
+#include <algorithm>
+#include <set>
 
 
 struct Tri_residue {
@@ -130,7 +132,7 @@ bool Ca_join::join( clipper::MiniMol& mol, const double& rmerg, const double& rj
 	      if ( mol1[chn][r1].type() == "UNK" ) break;
 	    for ( r2 = res+1; r2 < mol1[chn].size(); r2++ )
 	      if ( mol1[chn][r2].type() == "UNK" ) break;
-	    int d = clipper::Util::min( res-r1, r2-res );
+	    int d = std::min( res-r1, r2-res );
 	    fragment.score += 0.1 * double(d);  // upweight sequenced
 	    if ( d > 15 ) fragment.flag = 2;    // flag core sequenced
 	  }

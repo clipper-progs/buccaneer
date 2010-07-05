@@ -28,8 +28,8 @@ bool Ca_merge::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& x
     Ca_sequence::prepare_scores( mol[c1], xmap, llksample );
     Ca_sequence::sequence( mol[c1], seq, reliability_ );
   }
-  ProteinTools::break_chains( mol, xmap );
-  ProteinTools::chain_tidy( mol );
+  ProteinTools::split_chains_at_unk( mol, xmap );
+  ProteinTools::split_chains_at_gap( mol );
 
   // now try to augment each chain in turn to increasing the sequencing
   clipper::Coord_frac f1, f2;
@@ -86,10 +86,10 @@ bool Ca_merge::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& x
     }
   }
 
-  ProteinTools::chain_tidy( mol );  // split chains
+  ProteinTools::split_chains_at_gap( mol );  // split chains
   Ca_prune::prune( mol );
   Ca_build::build( mol, xmap );
-  ProteinTools::chain_tidy( mol );  // rename chains
+  ProteinTools::split_chains_at_gap( mol );  // rename chains
   return true;
 
   /*

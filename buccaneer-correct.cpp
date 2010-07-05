@@ -99,7 +99,7 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>&
   typedef clipper::MMonomer Mm;
 
   // split into separate chains
-  ProteinTools::chain_tidy( mol );
+  ProteinTools::split_chains_at_gap( mol );
 
   num_cor = 0;
 
@@ -124,12 +124,12 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>&
       if ( ins2 == std::string::npos || ins2 > len-buffer ) break;
       // pick a range of positions to modify
       int r1, r2;
-      int o1 = clipper::Util::max(ins1-offset,0);
-      int o2 = clipper::Util::min(ins2+offset,len-1);
+      int o1 = std::max(ins1-offset,0);
+      int o2 = std::min(ins2+offset,len-1);
       for ( r1 = ins1-1; r1 >  o1; r1-- ) if ( !isupper( seq0[r1] ) ) break;
       for ( r2 = ins2;   r2 <= o2; r2++ ) if ( !isupper( seq0[r2] ) ) break;
-      r1 = clipper::Util::max( r1, buffer );
-      r2 = clipper::Util::min( r2, len-buffer );
+      r1 = std::max( r1, buffer );
+      r2 = std::min( r2, len-buffer );
       // OPTIMISATION: mask the sequence
       for ( int r = 0; r < mpwrk.size(); r++ )
 	if ( r < r1-2 || r > r2+2 ) mpwrk[r].set_type( mpwrk[r].type() + "*" );
@@ -200,12 +200,12 @@ bool Ca_correct::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>&
       seqx += "????????";
       // pick a range of positions to modify
       int r1, r2;
-      int o1 = clipper::Util::max(del1-offset,0);
-      int o2 = clipper::Util::min(del2+offset,len-1);
+      int o1 = std::max(del1-offset,0);
+      int o2 = std::min(del2+offset,len-1);
       for ( r1 = del1-1; r1 >  o1; r1-- ) if ( !isupper( seq0[r1] ) ) break;
       for ( r2 = del2;   r2 <= o2; r2++ ) if ( !isupper( seq0[r2] ) ) break;
-      r1 = clipper::Util::max( r1, buffer );
-      r2 = clipper::Util::min( r2, len-buffer );
+      r1 = std::max( r1, buffer );
+      r2 = std::min( r2, len-buffer );
       // OPTIMISATION: mask the sequence
       for ( int r = 0; r < mpwrk.size(); r++ )
 	if ( r < r1-2 || r > r2+2 ) mpwrk[r].set_type( mpwrk[r].type() + "*" );

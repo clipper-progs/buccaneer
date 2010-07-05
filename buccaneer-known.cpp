@@ -60,27 +60,26 @@ KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<s
 }
 
 
-clipper::String KnownStructure::chain_ids() const
+bool KnownStructure::copy_to( clipper::MiniMol& mol ) const
 {
-  clipper::String result;
-  for ( int c = 0; c < known.size(); c++ ) result += known[c].id();
-  return result;
-}
-
-
-void KnownStructure::copy_to( clipper::MiniMol& mol ) const
-{
-  const clipper::Message_fatal msg("Internal chain ID error");
+  // check for id clash
+  bool idclash = false;
   for ( int c1 = 0; c1 < mol.size(); c1++ )
     for ( int c2 = 0; c2 < known.size(); c2++ )
-      if ( mol[c1].id() == known[c2].id() ) clipper::Message::message( msg );
+      if ( mol[c1].id() == known[c2].id() ) idclash = true;
+  if ( idclash )
+    for ( int c1 = 0; c1 < mol.size(); c1++ ) mol[c1].set_id( "" );
 
+  // combine known and built chains
   clipper::MiniMol prior = known;
   clipper::MiniMol built = mol;
   ProteinTools::symm_match( prior, built );
   mol = clipper::MiniMol( built.spacegroup(), built.cell() );
   for ( int c = 0; c < prior.size(); c++ ) mol.insert( prior[c] );
   for ( int c = 0; c < built.size(); c++ ) mol.insert( built[c] );  
+
+  // return true if copy was without clash
+  return !idclash;
 }
 
 

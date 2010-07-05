@@ -33,7 +33,7 @@ bool Ca_prune::prune( clipper::MiniMol& mol, double rad )
 
   // split into separate chains
   clipper::MiniMol moltmp = mol;
-  ProteinTools::chain_tidy( moltmp );
+  ProteinTools::split_chains_at_gap( moltmp );
 
   // now loop over chains
   clipper::Coord_frac cf1, cf2;

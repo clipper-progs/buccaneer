@@ -5,6 +5,8 @@
 
 #include <clipper/clipper-contrib.h>
 
+#include <algorithm>
+
 
 void Ca_build::build_rotate_rotamer( clipper::MMonomer& mm, int nr, int nc )
 {
@@ -155,7 +157,10 @@ bool Ca_build::build( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, c
     // build oxygens
     for ( int res = 0; res < mol[chn].size() - 1; res++ )
       if ( Mm::protein_peptide_bond( mol[chn][res], mol[chn][res+1] ) )
-        mol[chn][res].protein_mainchain_build_carbonyl_oxygen( mol[chn][res+1] );
+        mol[chn][res].protein_mainchain_build_carbonyl_oxygen(mol[chn][res+1]);
+      else
+	mol[chn][res].protein_mainchain_build_carbonyl_oxygen();
+    mol[chn][mol[chn].size()-1].protein_mainchain_build_carbonyl_oxygen();
   }
 
   // fix clashes

@@ -114,7 +114,7 @@ bool Ca_link::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xm
 		  Ca_group ca2( r8[i][4], r8[i][5], r8[i][6] );
 		  double s2 = llktarget.llk( xmap, ca2.rtop_from_std_ori() );
 		  if ( s2 < scrbest ) {
-		    scrbest = clipper::Util::max( s1, s2 );
+		    scrbest = std::max( s1, s2 );
 		    r8best = r8[i];
 		    resnbest = resn;
 		    rescbest = resc;

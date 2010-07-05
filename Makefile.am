@@ -13,7 +13,7 @@ buccaneer-grow.cpp     buccaneer-prep.h        simplex-lib.h \
 buccaneer-grow.h       buccaneer-prot.cpp      simulate-lib.cpp \
 buccaneer-join.cpp     buccaneer-prot.h        simulate-lib.h \
 buccaneer-known.cpp    buccaneer-known.h       buccaneer-merge.cpp \
-buccaneer-merge.h
+buccaneer-merge.h      buccaneer-tidy.cpp      buccaneer-tidy.h
 
 csequins_SOURCES = \
 csequins.cpp buccaneer-sequence.cpp simulate-lib.cpp buccaneer-prot.cpp \

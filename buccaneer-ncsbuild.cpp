@@ -28,7 +28,7 @@ bool Ca_ncsbuild::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
     llksample[t] = llktarget[t].sampled();
 
   // split into separate chains
-  ProteinTools::chain_tidy( mol );
+  ProteinTools::split_chains_at_gap( mol );
 
   // now loop over chains
   for ( int chn1 = 0; chn1 < mol.size(); chn1++ ) {
@@ -42,7 +42,7 @@ bool Ca_ncsbuild::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
     for ( int chn2 = 0; chn2 < mol.size(); chn2++ ) {
       if ( chn2 != chn1 ) {
 	clipper::RTop_orth rtop =
-	  ProteinTools::superpose( mol[chn2], mol[chn1], rmsd_, nmin_, 0 );
+	  ProteinTools::superpose( mol[chn2], mol[chn1], rmsd_, nmin_, nmin_ );
 	if ( !rtop.is_null() ) {
 	  clipper::MPolymer mp = mol[chn2];
 	  mp.transform( rtop );
@@ -66,7 +66,7 @@ bool Ca_ncsbuild::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
 	  // filter
 	  Ca_filter::filter( mol_wrk, xmap, 1.0 );
 	  // tidy
-	  ProteinTools::chain_tidy( mol_wrk );
+	  ProteinTools::split_chains_at_gap( mol_wrk );
 	  // make new chain
 	  if ( mol_wrk.size() > 0 ) mp2 = mol_wrk[0];
 	  mp2.copy( mp1, clipper::MM::COPY_MP );

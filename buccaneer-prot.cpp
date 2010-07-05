@@ -5,6 +5,9 @@
 #include "buccaneer-sequence.h"
 
 #include <clipper/clipper-contrib.h>
+
+#include <algorithm>
+
 extern "C" {
 #include <string.h>
 }
@@ -329,89 +332,6 @@ std::pair<int,int> ProteinTools::chain_sequence_match( const clipper::String& ch
 }
 
 
-bool ProteinTools::chain_renumber( clipper::MPolymer& pol, const clipper::MMoleculeSequence& seq )
-{
-  // convert sequences to unique strings
-  clipper::String chnseq = chain_sequence( pol );
-  std::vector<clipper::String> seqs( seq.size() );
-  for ( int chn = 0; chn < seq.size(); chn++ ) {
-    clipper::String s = "";
-    for ( int res = 0; res < seq[chn].sequence().length(); res++ )
-      s += residue_code_1(residue_index_1(seq[chn].sequence().substr(res,1)));
-    seqs[chn] = s;
-  }
-
-  // now find best match
-  int bestchn = -1;
-  int bestscr = 0;
-  clipper::MSequenceAlign align( clipper::MSequenceAlign::LOCAL,
-				 1.0, -1000.0, -4.0 );
-  std::pair<std::vector<int>,std::vector<int> > result;
-  for ( int chn = 0; chn < seqs.size(); chn++ ) {
-    const clipper::String& seqseq = seqs[chn];
-    result = align( chnseq, seqseq );
-    int scr = 0;
-    for ( int i = 0; i < result.first.size(); i++ ) {
-      if ( result.first[i] >= 0 ) {
-	if ( chnseq[i] == seqseq[result.first[i]] )
-	  scr++;
-	else
-	  scr--;
-      }
-    }
-    if ( scr > bestscr ) {
-      bestchn = chn;
-      bestscr = scr;
-    }
-  }
-  if ( bestchn < 0 ) return false;
-
-  // now number residues
-  clipper::String truseq = seqs[bestchn];
-  result = align( chnseq, truseq );
-  std::vector<int> nums = result.first;
-
-  /*
-  std::cout << bestchn << " " << bestscr << std::endl;
-  for ( int i = 0; i < chnseq.size(); i++ )
-    std::cout << chnseq[i];
-  std::cout << std::endl;
-  for ( int i = 0; i < chnseq.size(); i++ )
-    std::cout << (nums[i]>=0&&nums[i]<truseq.length() ? truseq[nums[i]] : '-');
-  std::cout << std::endl;
-  */
-
-  // find bounds of sequenced region
-  int i0, i1, i;
-  for ( i0 = 0;    i0 < nums.size(); i0++ ) if ( nums[i0] >= 0 ) break;
-  for ( i1 = nums.size()-1; i1 >= 0; i1-- ) if ( nums[i1] >= 0 ) break;
-  if ( i0 < nums.size() )
-    for ( i = i0 - 1; i >= 0;          i-- ) nums[i] = nums[i+1] - 1;
-  if ( i1 >= 0 )
-    for ( i = i1 + 1; i < nums.size(); i++ ) nums[i] = nums[i-1] + 1;
-
-  // renumber the model, with inscodes if necessary
-  const clipper::String inscodes = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const int l = inscodes.length();
-  for ( i = 0; i < nums.size(); i++ ) nums[i] = nums[i] * l;
-  for ( i = 1; i < nums.size(); i++ )
-    if ( nums[i] <= nums[i-1] ) nums[i] = nums[i-1]+1;
-  for ( i = 0; i < pol.size(); i++ ) {
-    const int nres = (nums[i]/l) + 1;
-    const int nins = clipper::Util::mod( nums[i], l );
-    if ( nins == 0 ) pol[i].set_seqnum( nres );
-    else             pol[i].set_seqnum( nres, inscodes.substr( nins, 1 ) );
-  }
-
-  /*
-  for ( int i = 0; i < chnseq.size()-1; i++ )
-    if ( nums[i+1] != nums[i]+1 ) std::cout << "! " << pol.id() << " " << nums[i] << " " << nums[i+1] << std::endl;
-  */
-
-  return true;
-}
-
-
 clipper::RTop_orth ProteinTools::superpose( const clipper::MPolymer& mp1, const clipper::MPolymer& mp2, const double& rmsd, const int& nmatch, const int& nmismatch )
 {
   clipper::RTop_orth result = clipper::RTop_orth::null();
@@ -497,46 +417,26 @@ clipper::RTop_orth ProteinTools::superpose( const clipper::MPolymer& mp1, const 
 }
 
 
-bool ProteinTools::chain_tidy( clipper::MiniMol& mol )
+bool ProteinTools::chain_number( clipper::MiniMol& mol )
 {
-  typedef clipper::MMonomer Mm;
-  // create new minimol
-  clipper::MiniMol target( mol.spacegroup(), mol.cell() );
-  // now separate unlinked fragments into separate chains
-  clipper::MPolymer mp, mpnull;
-  for ( int chn = 0; chn < mol.size(); chn++ ) {
-    mp = mpnull;
-    for ( int res = 0; res < mol[chn].size(); res++ ) {
-      mp.insert( mol[chn][res] );
-      if ( res < mol[chn].size()-1 )
-	if ( !Mm::protein_peptide_bond(mol[chn][res],mol[chn][res+1]) ) {
-	  target.insert( mp );
-	  mp = mpnull;
-	}
-    }
-    if ( mp.size() > 0 ) target.insert( mp );
-  }
-
-  // sort the chains by size
-  std::vector<std::pair<int,int> > chnsiz( target.size() ); 
-  for ( int chn = 0; chn < target.size(); chn++ )
-    chnsiz[chn] = std::pair<int,int>( -target[chn].size(), chn );
-  std::sort( chnsiz.begin(), chnsiz.end() );
-  clipper::MiniMol temp = target;
-  for ( int chn = 0; chn < target.size(); chn++ )
-    target[chn] = temp[chnsiz[chn].second];
-
-  mol = target;
+  for ( int chn = 0; chn < mol.size(); chn++ )
+    for ( int res = 0; res < mol[chn].size(); res++ )
+      mol[chn][res].set_seqnum( res+1 );
   return true;
 }
 
 
-bool ProteinTools::chain_label( clipper::MiniMol& mol, clipper::String chainids )
+bool ProteinTools::chain_label( clipper::MiniMol& mol )
 {
   // set up default chain labels
   std::vector<clipper::String> labels;
   labels.push_back( "ABCDEFGHIJKLMNOPQRSTUVWXYZ" );
   labels.push_back( "abcdefghijklmnopqrstuvwxyz" );
+
+  // get existing labels
+  clipper::String chainids = "";
+  for ( int chn = 0; chn < mol.size(); chn++ )
+    chainids = chainids + mol[chn].id();
 
   // eliminate labels used in known structure
   for ( int i = 0; i < labels.size(); i++ ) {
@@ -548,18 +448,21 @@ bool ProteinTools::chain_label( clipper::MiniMol& mol, clipper::String chainids 
   }
 
   // label chains
+  int label = 0;
   for ( int chn = 0; chn < mol.size(); chn++ ) {
-    if ( chn < labels[0].length() ) {
-      mol[chn].set_id( labels[0].substr( chn, 1 ) );
-      for ( int res = 0; res < mol[chn].size(); res++ )
-	mol[chn][res].set_seqnum( res + 1 );
+    if ( label < labels[0].length() ) {
+      if ( mol[chn].id() == "" ) {
+	mol[chn].set_id( labels[0].substr( label, 1 ) );
+	label++;
+      }
     } else {
-      int c = chn - labels[0].length();
+      int c = label - labels[0].length();
       int c1 = c % labels[1].length();
       int c2 = c / labels[1].length();
       mol[chn].set_id( labels[1].substr( c1, 1 ) );
       for ( int res = 0; res < mol[chn].size(); res++ )
 	mol[chn][res].set_seqnum( res + 1 + 1000*c2 );
+      label++;
     }
   }
   return true;
@@ -839,7 +742,41 @@ std::vector<float> ProteinTools::main_chain_densities( const clipper::MPolymer& 
 }
 
 
-bool ProteinTools::break_chains( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap )
+bool ProteinTools::split_chains_at_gap( clipper::MiniMol& mol )
+{
+  typedef clipper::MMonomer Mm;
+  // create new minimol
+  clipper::MiniMol target( mol.spacegroup(), mol.cell() );
+  // now separate unlinked fragments into separate chains
+  clipper::MPolymer mp, mpnull;
+  for ( int chn = 0; chn < mol.size(); chn++ ) {
+    mp = mpnull;
+    for ( int res = 0; res < mol[chn].size(); res++ ) {
+      mp.insert( mol[chn][res] );
+      if ( res < mol[chn].size()-1 )
+	if ( !Mm::protein_peptide_bond(mol[chn][res],mol[chn][res+1]) ) {
+	  target.insert( mp );
+	  mp = mpnull;
+	}
+    }
+    if ( mp.size() > 0 ) target.insert( mp );
+  }
+
+  // sort the chains by size
+  std::vector<std::pair<int,int> > chnsiz( target.size() ); 
+  for ( int chn = 0; chn < target.size(); chn++ )
+    chnsiz[chn] = std::pair<int,int>( -target[chn].size(), chn );
+  std::sort( chnsiz.begin(), chnsiz.end() );
+  clipper::MiniMol temp = target;
+  for ( int chn = 0; chn < target.size(); chn++ )
+    target[chn] = temp[chnsiz[chn].second];
+
+  mol = target;
+  return true;
+}
+
+
+bool ProteinTools::split_chains_at_unk( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap )
 {
   // separate broken chains
   for ( int chn = 0; chn < mol.size(); chn++ ) {

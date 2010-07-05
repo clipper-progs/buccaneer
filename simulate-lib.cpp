@@ -3,6 +3,8 @@
 
 #include "simulate-lib.h"
 
+#include <algorithm>
+
 
 MapSimulate::MapSimulate( int nresbins, int binmin )
 {

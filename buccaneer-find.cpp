@@ -276,8 +276,8 @@ std::vector<SearchResult> SSfind::search( const std::vector<Pair_coord>& target_
 	float lo = mapbox[index0+index_list[0].second];
 	int i = 1;
 	while ( hi - lo > bestlim ) {                     // loop over points
-	  hi = clipper::Util::min( hi, mapbox[index0+index_list[i].first ] );
-	  lo = clipper::Util::max( lo, mapbox[index0+index_list[i].second] );
+	  hi = std::min( hi, mapbox[index0+index_list[i].first ] );
+	  lo = std::max( lo, mapbox[index0+index_list[i].second] );
 	  i++;
 	  if ( !( i < index_list.size() ) ) break;
 	}
@@ -289,7 +289,7 @@ std::vector<SearchResult> SSfind::search( const std::vector<Pair_coord>& target_
     }
     rslts[i].score = bestscr;  // store
     rslts[i].rot   = bestrot;
-    bestcut = clipper::Util::max( bestscl*bestscr, bestcut );  // optimisation
+    bestcut = std::max( bestscl*bestscr, bestcut );  // optimisation
   }
 
   // eliminate any results which would have been eliminated by the cutoff
@@ -581,7 +581,7 @@ std::vector<SearchResult> Ca_find::search_sec( const clipper::Xmap<float>& xmap,
 
   // rescore
   double s0(0.0), s1(0.0), s2(0.0);
-  int zstep = clipper::Util::max( int(result.size()/1000), 1 );
+  int zstep = std::max( int(result.size()/1000), 1 );
   for ( int i = 0; i < result.size(); i++ ) {
     clipper::Coord_orth co =
       xmap.coord_orth( grid.deindex( result[i].trn ).coord_map() );

@@ -153,16 +153,16 @@ class ProteinTools {
   static clipper::String residue_codes() { return clipper::String( "ARNDCQEGHILKMFPSTWYV" ); }
   static clipper::String chain_sequence( const clipper::MPolymer& mp );
   static std::pair<int,int> chain_sequence_match( const clipper::String& chnseq, const clipper::MMoleculeSequence& seq );
-  static bool chain_renumber( clipper::MPolymer& pol, const clipper::MMoleculeSequence& seq );
   static clipper::RTop_orth superpose( const clipper::MPolymer& mp1, const clipper::MPolymer& mp2, const double& rmsd, const int& nmatch, const int& nmismatch );
-  static bool chain_tidy( clipper::MiniMol& mol );
-  static bool chain_label( clipper::MiniMol& mol, clipper::String chainids );
+  static bool chain_number( clipper::MiniMol& mol );
+  static bool chain_label( clipper::MiniMol& mol );
   static bool copy_residue_types( clipper::MiniMol& target, const clipper::MiniMol& source );
   static bool globularise( clipper::MiniMol& mol, const clipper::Coord_frac cent );
   static bool globularise( clipper::MiniMol& mol );
   static bool symm_match( clipper::MiniMol& molwrk, const clipper::MiniMol& molref );
   static std::vector<float> main_chain_densities( const clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, int nsmooth=0 );
-  static bool break_chains( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap );
+  static bool split_chains_at_gap( clipper::MiniMol& mol );
+  static bool split_chains_at_unk( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap );
  private:
   class MapFilterFn_g5 : public clipper::MapFilterFn_base { public:
     clipper::ftype operator() ( const clipper::ftype& radius ) const { return exp(-radius*radius/50.0); }
