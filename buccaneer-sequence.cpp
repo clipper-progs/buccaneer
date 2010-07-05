@@ -5,6 +5,8 @@
 
 #include <clipper/clipper-contrib.h>
 
+#include <algorithm>
+
 
 int Ca_sequence::ncpu = 0;
 bool Ca_sequence::semet_ = false;
@@ -275,7 +277,7 @@ std::vector<clipper::String> Ca_sequence::sequence_align( const std::vector<std:
     scrs.add( scr.first, result[i] );
   }
   std::cout << "DEBUG " << result.size() << " " << scrs.size() << std::endl;
-  for ( int i = 0; i < clipper::Util::min(int(scrs.size()),3); i++ )
+  for ( int i = 0; i < std::min(int(scrs.size()),3); i++ )
     std::cout << i << "\t" << scrs.score(i) << "\t" << scrs[i] << std::endl;
   */
 
@@ -366,7 +368,7 @@ Score_list<clipper::String> Ca_sequence::sequence_chain( clipper::MChain& chain,
   // check for valid types
   int ntyp = 0;
   for ( int res = 0; res < nres; res++ )
-    ntyp = clipper::Util::max( ntyp, int(scores[res].size()) );
+    ntyp = std::max( ntyp, int(scores[res].size()) );
   if ( ntyp == 0 ) return Score_list<clipper::String>();
 
   // normalise across rows by mean with moving average
@@ -383,8 +385,8 @@ Score_list<clipper::String> Ca_sequence::sequence_chain( clipper::MChain& chain,
   // calc moving average
   int dr = 5;  // nres / 5 + 1;
   for ( int r = 0; r < nres; r++ ) {
-    int r1 = clipper::Util::max( r - dr    ,    0 );
-    int r2 = clipper::Util::min( r + dr + 1, nres );
+    int r1 = std::max( r - dr    ,    0 );
+    int r2 = std::min( r + dr + 1, nres );
     rscores[r] = ( rcum[r2] - rcum[r1] ) / double( r2 - r1 );
   }
   // and correct
@@ -554,7 +556,7 @@ bool Ca_sequence::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
     llksample[t] = llktarget[t].sampled();
 
   // split into separate chains
-  ProteinTools::chain_tidy( mol );
+  ProteinTools::split_chains_at_gap( mol );
 
   // score residues
   for ( int chn = 0; chn < mol.size(); chn++ )
@@ -572,7 +574,7 @@ bool Ca_sequence::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
   history = seqnc.history();
 
   // break chains where the sequence is broken
-  ProteinTools::break_chains( mol, xmap );
+  ProteinTools::split_chains_at_unk( mol, xmap );
 
   // count sequenced residues
   num_seq = 0;
@@ -595,7 +597,7 @@ clipper::String Ca_sequence::format() const
 {
   clipper::String result = "";
   for ( int chn = 0; chn < history.size(); chn++ ) {
-    int nhist = clipper::Util::min( history[chn].size(), 5 );
+    int nhist = std::min( history[chn].size(), 5 );
     if ( nhist > 0 ) {
       result += "Chain number: " + clipper::String( chn, 4 ) + "    length: " + clipper::String( int(history[chn][0].length()) ) + "\n";
       for ( int res = 0; res < nhist; res++ ) {
