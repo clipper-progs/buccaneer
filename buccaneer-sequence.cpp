@@ -122,6 +122,7 @@ Score_list<clipper::String> Ca_sequence::sequence_combine( const Score_list<clip
       int j;
       for ( j = i+1; j < seq.size(); j++ )
 	if ( sequence_overlap( seq[i], seq[j] ) > 0.20 ) break;
+      if ( j == seq.size() ) continue;
       double r = phi_approx( seq.score(i) - seq.score(j) );
       // if score difference good then add matched region to sequence
       if ( r < 1.0-reliability ) {
