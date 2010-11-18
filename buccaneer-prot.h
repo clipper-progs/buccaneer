@@ -163,6 +163,7 @@ class ProteinTools {
   static std::vector<float> main_chain_densities( const clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, int nsmooth=0 );
   static bool split_chains_at_gap( clipper::MiniMol& mol );
   static bool split_chains_at_unk( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap );
+  static bool tidy_peptide_bond( clipper::MMonomer& mm1, clipper::MMonomer& mm2 );
  private:
   class MapFilterFn_g5 : public clipper::MapFilterFn_base { public:
     clipper::ftype operator() ( const clipper::ftype& radius ) const { return exp(-radius*radius/50.0); }

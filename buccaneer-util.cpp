@@ -60,14 +60,12 @@ void BuccaneerUtil::read_model( clipper::MiniMol& mol, clipper::String file, boo
 	clipper::MiniMol moltmp;
 	mmdb.read_file( files[f] );
 	mmdb.import_minimol( moltmp );
-	std::cout << "Read PDB file: " << files[f] << std::endl;
+	clipper::Atom_list atoms = moltmp.atom_list();
+	std::cout << "PDB file: " << files[f] << std::endl;
+	std::cout << "  Number of atoms read: " << atoms.size() << std::endl;
 	for ( int c = 0; c < moltmp.size(); c++ )
 	  if ( moltmp[c].id() != "!" ) mol.insert( moltmp[c] );	
-	if ( verbose ) {
-	  clipper::Atom_list atoms = moltmp.atom_list();
-	  std::cout << "Number of atoms read: " << atoms.size() << std::endl;
-	  for ( int i = 0; i < atoms.size(); i += atoms.size()-1 ) printf("%i6  %4s  %8.3f %8.3f %8.3f\n", i, atoms[i].element().c_str(), atoms[i].coord_orth().x(), atoms[i].coord_orth().y(), atoms[i].coord_orth().z() );
-	}
+	if ( verbose ) for ( int i = 0; i < atoms.size(); i += atoms.size()-1 ) printf("%i6  %4s  %8.3f %8.3f %8.3f\n", i, atoms[i].element().c_str(), atoms[i].coord_orth().x(), atoms[i].coord_orth().y(), atoms[i].coord_orth().z() );
       } catch ( clipper::Message_fatal ) {
 	std::cout << "FAILED TO READ PDB FILE: " << file << std::endl;
       }

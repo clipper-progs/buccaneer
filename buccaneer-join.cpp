@@ -296,39 +296,9 @@ bool Ca_join::join( clipper::MiniMol& mol, const double& rmerg, const double& rj
   }
 
   // tidy up the peptide bonds
-  const double dmax = 1.45;
-  for ( int chn = 0; chn < mol2.size(); chn++ ) {
-    for ( int res = 0; res < mol2[chn].size()-1; res++ ) {
-      int a1 = mol2[chn][res  ].lookup( " CA ", clipper::MM::ANY );
-      int c1 = mol2[chn][res  ].lookup( " C  ", clipper::MM::ANY );
-      int n2 = mol2[chn][res+1].lookup( " N  ", clipper::MM::ANY );
-      int a2 = mol2[chn][res+1].lookup( " CA ", clipper::MM::ANY );
-      if ( a1 >= 0 && c1 >= 0 && n2 >= 0 && a2 >= 0 ) {
-	// rebuild peptide units
-	clipper::Coord_orth ca1 = mol2[chn][res  ][a1].coord_orth();
-	clipper::Coord_orth cc1 = mol2[chn][res  ][c1].coord_orth();
-	clipper::Coord_orth cn2 = mol2[chn][res+1][n2].coord_orth();
-	clipper::Coord_orth ca2 = mol2[chn][res+1][a2].coord_orth();
-	// check and rebuild peptide units if necessary
-	if ( (cc1-cn2).lengthsq() > dmax*dmax ) {
-	  clipper::Vec3<> v = clipper::Vec3<>::cross( cn2-cc1, ca2-ca1 );
-	  v = clipper::Vec3<>::cross( v, ca2-ca1 ).unit();
-	  cc1 = clipper::Coord_orth( 0.63*ca1 + 0.37*ca2 + 0.57*v );
-	  cn2 = clipper::Coord_orth( 0.37*ca1 + 0.63*ca2 - 0.43*v );
-	}
-	// check and restore C-N connectivity if necessary
-	if ( (cc1-cn2).lengthsq() > dmax*dmax ) {
-	  double d = sqrt( ( cc1 - cn2 ).lengthsq() );
-	  double f = 0.5 * ( 1.0 - dmax / d );
-	  cc1 = (1.0-f)*cc1 + f*cn2;
-	  cn2 = (1.0-f)*cn2 + f*cc1;
-	}
-	// store
-	mol2[chn][res  ][c1].set_coord_orth( cc1 );
-	mol2[chn][res+1][n2].set_coord_orth( cn2 );
-      }
-    }
-  }
+  for ( int chn = 0; chn < mol2.size(); chn++ )
+    for ( int res = 0; res < mol2[chn].size()-1; res++ )
+      ProteinTools::tidy_peptide_bond( mol2[chn][res], mol2[chn][res+1] );
 
   // globularise
   ProteinTools::globularise( mol2, comf );

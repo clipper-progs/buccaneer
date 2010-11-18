@@ -18,12 +18,12 @@ class Ca_sequence {
   static void prepare_scores( clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target::Sampled>& llksample );
   static double sequence_overlap( const clipper::String& seq1, const clipper::String& seq2 );
   static double sequence_similarity( const clipper::String& seq1, const clipper::String& seq2 );
-  static Score_list<clipper::String> sequence_combine( const Score_list<clipper::String>& seq, const double& reliability );
+  static std::vector<bool> sequence_combine( const Score_list<clipper::String>& seq, const double& reliability );
   static std::pair<double,std::pair<int,int> > sequence_score( const std::vector<std::vector<double> >& scores, const clipper::String& subseq );
   static std::vector<clipper::String> sequence_align( const std::vector<std::vector<double> >& scores, const clipper::String& seq );
   static Score_list<clipper::String> sequence_match( const std::vector<std::vector<double> >& scores, const clipper::MMoleculeSequence& seq );
   static Score_list<clipper::String> sequence_chain( clipper::MChain& chain, const clipper::MMoleculeSequence& seq );
-  static void sequence_apply( clipper::MChain& chain, const clipper::String& seq );
+  static void sequence_apply( clipper::MChain& chain, const Score_list<clipper::String>& seq, const std::vector<bool>& flags );
   static Score_list<clipper::String> sequence( clipper::MChain& chain, const clipper::MMoleculeSequence& seq, const double& reliability );
 
   static void set_semet( bool semet ) { semet_ = semet; }

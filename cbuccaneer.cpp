@@ -27,7 +27,7 @@ extern "C" {
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.5.0", "$Date: 2010/05/28" );
+  CCP4Program prog( "cbuccaneer", "1.5.1", "$Date: 2010/10/18" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2010 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -62,6 +62,7 @@ int main( int argc, char** argv )
   int ncpu = 0;
   int nfrag  = 500;
   int nfragr = 20;
+  int freerindex = 0;
   int modelindex = 0;
   bool merge = false;  // multimodel merge
   bool find  = false;  // calculation steps
@@ -167,6 +168,8 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) nfrag  = clipper::String(args[arg]).i();
     } else if ( key == "-fragments-per-100-residues" ) {
       if ( ++arg < args.size() ) nfragr = clipper::String(args[arg]).i();
+    } else if ( key == "-free-flag" ) {
+      if ( ++arg < args.size() ) freerindex = clipper::String(args[arg]).i();
     } else if ( key == "-model-index" ) {
       if ( ++arg < args.size() ) modelindex = clipper::String(args[arg]).i();
     } else if ( key == "-ramachandran-filter" ) {
@@ -238,6 +241,7 @@ int main( int argc, char** argv )
   if ( ipmtz_ref == "NONE" || ippdb_ref == "NONE" )
     BuccaneerUtil::set_reference( ipmtz_ref, ippdb_ref );
   BuccaneerLog log;
+  std::cout << std::endl;
 
   // Get resolution for calculation
   mtzfile.open_read( ipmtz_ref );
@@ -262,6 +266,7 @@ int main( int argc, char** argv )
   // Get work reflection data
   clipper::MTZcrystal cxtl;
   clipper::HKL_info hkls_wrk;
+  mtzfile.set_verbose( (verbose>0) ? 3 : 2 );
   mtzfile.open_read( ipmtz_wrk );
   hkls_wrk.init( mtzfile.spacegroup(), mtzfile.cell(), resol, true );
   mtzfile.import_crystal( cxtl, ipcol_wrk_fo+".F_sigF.F" );
@@ -295,8 +300,8 @@ int main( int argc, char** argv )
 
   // apply free flag
   clipper::HKL_data<F_sigF> wrk_fwrk = wrk_f;
-  //wrk_fwrk.mask( flag != 0 );
-  for ( clipper::HKL_data_base::HKL_reference_index ih = hkls_wrk.first(); !ih.last(); ih.next() ) if ( flag[ih].flag() == 0 ) wrk_fwrk[ih] = F_sigF();  //ugly hack for broken SGI compilers
+  //wrk_fwrk.mask( flag != freerindex );
+  for ( clipper::HKL_data_base::HKL_reference_index ih = hkls_wrk.first(); !ih.last(); ih.next() ) if ( flag[ih].flag() == freerindex ) wrk_fwrk[ih] = F_sigF();  //ugly hack for broken SGI compilers
   // and fill in hl
   if ( ipcol_wrk_hl == "NONE" )
     wrk_hl.compute( wrk_pw, Compute_abcd_from_phifom() );
@@ -509,7 +514,7 @@ int main( int argc, char** argv )
 
       // user output
       std::cout << std::endl;
-      if ( verbose >= 1 ) std::cout << history << std::endl;
+      if ( verbose > 7 ) std::cout << history << std::endl;
       int nres, nseq, nchn, nmax;
       nchn = mol_wrk.size();
       nres = nseq = nmax = 0;

@@ -106,35 +106,33 @@ double Ca_sequence::sequence_similarity( const clipper::String& seq1, const clip
 
 
 /*! Combine multiple non-conflicting sequence alignments. */
-Score_list<clipper::String> Ca_sequence::sequence_combine( const Score_list<clipper::String>& seq, const double& reliability )
+std::vector<bool> Ca_sequence::sequence_combine( const Score_list<clipper::String>& seq, const double& reliability )
 {
-  Score_list<clipper::String> result = seq;
+  std::vector<bool> result( seq.size(), false );
   if ( seq.size() == 0 ) return result;
   int len = seq[0].size();
   clipper::String totseq = std::string( len, '?' );
   clipper::String newseq;
-  double totscr = 0.0;
-  bool keep = false;
   for ( int i = 0; i < seq.size()-1; i++ ) {
     // ignore sequences which clash with current multisequence
     if ( sequence_overlap( seq[i], totseq ) < 0.40 ) {
       // now check whether this sequence meets the score criterion
-      int j;
-      for ( j = i+1; j < seq.size(); j++ )
-	if ( sequence_overlap( seq[i], seq[j] ) > 0.20 ) break;
-      if ( j == seq.size() ) continue;
-      double r = phi_approx( seq.score(i) - seq.score(j) );
+      double r = 0.0;
+      for ( int j = i+1; j < seq.size(); j++ )
+	if ( sequence_overlap( seq[i], seq[j] ) > 0.20 ) {
+          r = phi_approx( seq.score(i) - seq.score(j) );
+          break;
+        }
       // if score difference good then add matched region to sequence
       if ( r < 1.0-reliability ) {
+        result[i] = true;
 	clipper::String addseq = seq[i];
 	newseq = "";
 	for ( int k = 0; k < len; k++ )
 	  newseq += ( totseq[k] == '?' ) ? addseq[k] : totseq[k];
 	totseq = newseq;
-	totscr = -999.0;
-	keep = true;
       }
-      //  mask the corresponding region
+      // mask the corresponding region
       int k1 = seq[i].find_first_not_of( "?" ) - 3;
       int k2 = seq[i].find_last_not_of( "?" ) + 3;
       newseq = "";
@@ -144,12 +142,6 @@ Score_list<clipper::String> Ca_sequence::sequence_combine( const Score_list<clip
       totseq = newseq;
     }
   }
-  // change 'x' back to '?'
-  newseq = "";
-  for ( int k = 0; k < len; k++ )
-    newseq += ( totseq[k] == 'x' ) ? '?' : totseq[k];
-  // add a new entry if a multisequence was found
-  if ( keep ) result.add( totscr, newseq );
   return result;
 }
 
@@ -452,71 +444,57 @@ Score_list<clipper::String> Ca_sequence::sequence_chain( clipper::MChain& chain,
 
 /*! Having found a sequence match, apply it to the chain, taking into
   account any existing sequence. */
-void Ca_sequence::sequence_apply( clipper::MChain& chain, const clipper::String& seq )
+void Ca_sequence::sequence_apply( clipper::MChain& chain, const Score_list<clipper::String>& seq, const std::vector<bool>& flags )
 {
-  if ( chain.size() != seq.length() ) clipper::Message::message( clipper::Message_fatal( "Sequence: internal error - length mismatch" ) );
+  if ( seq.size() == 0 ) return;
+  if ( seq.size() != flags.size() ) clipper::Message::message( clipper::Message_fatal( "Sequence: internal error - length mismatch" ) );
+  if ( seq[0].size() != chain.size() ) clipper::Message::message( clipper::Message_fatal( "Sequence: internal error - length mismatch" ) );
 
   const clipper::String unktyp = "UNK";
 
-  // make old and new sequences
-  int m, m1, m2;
-  std::vector<clipper::String> oldseq(chain.size()), newseq(chain.size());
-  std::vector<int> oldtyp(chain.size()), newtyp(chain.size());
-  for ( m = 0; m < chain.size(); m++ ) {
-    oldseq[m] = chain[m].type();
-    int t = ProteinTools::residue_index_translate( seq[m] );
-    if ( t >= 0 ) newseq[m] = ProteinTools::residue_code_3( t );
-    else if ( seq[m] == '+' ) newseq[m] = "+++";
-    else if ( seq[m] == '-' ) newseq[m] = "---";
-    else newseq[m] = unktyp;
-    oldtyp[m] = ProteinTools::residue_index_3( oldseq[m] );
-    newtyp[m] = ProteinTools::residue_index_3( newseq[m] );
-  }
+  // get old and new sequences
+  clipper::String curseq = ProteinTools::chain_sequence( chain );
 
-  // now find contiguous regions in oldseq trace
-  std::vector<std::pair<int,int> > regions;
-  m = 0;
-  while ( m < oldtyp.size() ) {
-    while ( m < oldtyp.size() ) {
-      if ( oldtyp[m] >= 0 ) break;
-      m++;
+  // merge sequences in turn
+  //std::cout << "OLD: " << curseq << std::endl;
+  for ( int i = seq.size()-1; i >= 0; i-- )
+    if ( flags[i] ) {
+      // check if the new sequence overlaps/contradicts existing sequence
+      clipper::String newseq = seq[i];
+      int match(0), mismatch(0);
+      for ( int r = 0; r < newseq.size(); r++ ) {
+        int t1 = ProteinTools::residue_index_translate( curseq[r] );
+        int t2 = ProteinTools::residue_index_translate( newseq[r] );
+        if ( t1 >= 0 && t2 >= 0 ) {
+          if ( t1 == t2 ) match++;
+          else mismatch++;
+        }
+      }
+      // if there is a clash, mask the ends
+      if ( match == 0 || mismatch > 0 ) {
+        int r1 = newseq.find_first_not_of( "?" ) - 3;
+        int r2 = newseq.find_last_not_of( "?" ) + 3;
+        for ( int r = 0; r < curseq.length(); r++ )
+          if ( r >= r1 && r <= r2 ) curseq[r] = '?';
+      }
+      // apply the sequence
+      for ( int r = 0; r < curseq.size(); r++ )
+        if ( newseq[r] != '?' ) curseq[r] = newseq[r];
     }
-    m1 = m;
-    while ( m < oldtyp.size() ) {
-      if ( oldtyp[m] <  0 ) break;
-      m++;
-    }
-    m2 = m;
-    if ( m2 > m1 ) regions.push_back( std::pair<int,int>( m1, m2 ) );
+  //std::cout << "NEW: " << curseq << std::endl;
+
+  // apply to chain
+  for ( int r = 0; r < chain.size(); r++ ) {
+    int t = ProteinTools::residue_index_translate( curseq[r] );
+    clipper::String newtype = "UNK";
+    if ( t >= 0 )
+      newtype = ProteinTools::residue_code_3( t );
+    else if ( curseq[r] == '+' )
+      newtype = "+++";
+    else if ( curseq[r] == '-' )
+      newtype = "---";
+    chain[r].set_type( newtype );
   }
-
-  // check each region in turn for clashes
-  for ( int i = 0; i < regions.size(); i++ ) {
-    bool clash = false;
-    m1 = regions[i].first;
-    m2 = regions[i].second;
-    for ( m = m1; m < m2; m++ )
-      if ( newtyp[m] >= 0 && newtyp[m] != oldtyp[m] )
-	clash = true;
-    if ( m1 > 0 )
-      if ( newtyp[m1-1] >= 0 && newtyp[m1] < 0 )
-	clash = true;
-    if ( m2 < newtyp.size() )
-      if ( newtyp[m2-1] < 0 && newtyp[m2] >= 0 )
-	clash = true;
-    if ( clash ) for ( m = m1; m < m2; m++ ) oldseq[m] = unktyp;
-  }
-
-  // combine the remaining types
-  for ( m = 0; m < newseq.size(); m++ )
-    if ( newseq[m] != unktyp ) chain[m].set_type( newseq[m] );
-    else                       chain[m].set_type( oldseq[m] );
-
-  /*
-  std::cout << "Applying sequence on chain " << chain.id() << " length " << chain.size() << "\n";
-  for ( int i = 0; i < regions.size(); i++ ) std::cout << regions[i].first << " " << regions[i].second << "\n";
-  for ( m = 0; m < chain.size(); m++ ) std::cout << m << "\t" << oldseq[m].type() << "\t" << newseq[m].type() << "\t" << chain[m].type() << "\n";
-  */
 }
 
 
@@ -526,17 +504,10 @@ Score_list<clipper::String> Ca_sequence::sequence( clipper::MChain& chain, const
   Score_list<clipper::String> matches = sequence_chain( chain, seq );
 
   // now check for multiple matches
-  matches = sequence_combine( matches, reliability );
-
-  // test the reliability of the sequence match
-  bool apply = false;
-  if ( matches.size() >= 2 ) {
-    double r = Ca_sequence::phi_approx( matches.score(0) - matches.score(1) );
-    if ( r < 1.0-reliability ) apply = true;
-  }
+  std::vector<bool> flags = sequence_combine( matches, reliability );
 
   // apply sequence
-  if ( apply ) sequence_apply( chain, matches[0] );
+  sequence_apply( chain, matches, flags );
 
   // translate MSE
   if ( semet_ )

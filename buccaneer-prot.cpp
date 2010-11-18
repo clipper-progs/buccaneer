@@ -830,6 +830,44 @@ bool ProteinTools::split_chains_at_unk( clipper::MiniMol& mol, const clipper::Xm
 }
 
 
+bool ProteinTools::tidy_peptide_bond( clipper::MMonomer& mm1, clipper::MMonomer& mm2 )
+{
+  const double cmax = 4.5;
+  const double dmax = 1.45;
+  int a1 = mm1.lookup( " CA ", clipper::MM::ANY );
+  int c1 = mm1.lookup( " C  ", clipper::MM::ANY );
+  int n2 = mm2.lookup( " N  ", clipper::MM::ANY );
+  int a2 = mm2.lookup( " CA ", clipper::MM::ANY );
+  if ( a1 >= 0 && c1 >= 0 && n2 >= 0 && a2 >= 0 ) {
+    // rebuild peptide units
+    clipper::Coord_orth ca1 = mm1[a1].coord_orth();
+    clipper::Coord_orth cc1 = mm1[c1].coord_orth();
+    clipper::Coord_orth cn2 = mm2[n2].coord_orth();
+    clipper::Coord_orth ca2 = mm2[a2].coord_orth();
+    if ( (ca1-ca2).lengthsq() < cmax*cmax ) {
+      // check and rebuild peptide units if necessary
+      if ( (cc1-cn2).lengthsq() > dmax*dmax ) {
+	clipper::Vec3<> v = clipper::Vec3<>::cross( cn2-cc1, ca2-ca1 );
+	v = clipper::Vec3<>::cross( v, ca2-ca1 ).unit();
+	cc1 = clipper::Coord_orth( 0.63*ca1 + 0.37*ca2 + 0.57*v );
+	cn2 = clipper::Coord_orth( 0.37*ca1 + 0.63*ca2 - 0.43*v );
+      }
+      // check and restore C-N connectivity if necessary
+      if ( (cc1-cn2).lengthsq() > dmax*dmax ) {
+	double d = sqrt( ( cc1 - cn2 ).lengthsq() );
+	double f = 0.5 * ( 1.0 - dmax / d );
+	cc1 = (1.0-f)*cc1 + f*cn2;
+	cn2 = (1.0-f)*cn2 + f*cc1;
+      }
+      // store
+      mm1[c1].set_coord_orth( cc1 );
+      mm2[n2].set_coord_orth( cn2 );
+    }
+  }
+  return true;
+}
+
+
 const int ProteinTools::ntype = 21;
 const char ProteinTools::rtype1[21] =
  {  'A',  'R',  'N',  'D',  'C',  'Q',  'E',  'G',  'H',  'I',
