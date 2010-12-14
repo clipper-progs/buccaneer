@@ -5,6 +5,10 @@
 #include <clipper/clipper-contrib.h>
 #include "simulate-lib.h"
 #include "buccaneer-sequence.h"
+
+extern "C" {
+#include <stdlib.h>
+}
 //#include "buccaneer-correct.h"
 //#include "buccaneer-build.h"
 
