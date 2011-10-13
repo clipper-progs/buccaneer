@@ -6,6 +6,10 @@
 
 #include <algorithm>
 
+#ifdef scr1 // defined on Windows
+# undef scr1
+# undef scr2
+#endif
 
 bool ModelTidy::tidy( clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, const clipper::MMoleculeSequence& seq ) const
 {

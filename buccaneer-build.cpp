@@ -7,6 +7,11 @@
 
 #include <algorithm>
 
+#ifdef scr1 // defined on Windows
+# undef scr1
+# undef scr2
+#endif
+
 
 void Ca_build::build_rotate_rotamer( clipper::MMonomer& mm, int nr, int nc )
 {

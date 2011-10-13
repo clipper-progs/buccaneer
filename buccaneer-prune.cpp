@@ -5,6 +5,10 @@
 
 #include <clipper/clipper-contrib.h>
 
+#ifdef scr1 // defined on Windows
+# undef scr1
+# undef scr2
+#endif
 
 
 std::vector<int> Ca_prune::score_positions( const clipper::MPolymer& mp )
