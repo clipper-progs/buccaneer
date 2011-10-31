@@ -18,13 +18,17 @@ class BuccaneerUtil {
 
 class BuccaneerLog {
  public:
-  BuccaneerLog() : currentcpu(0.0) { log(""); }
+  BuccaneerLog( clipper::String& title ) : title_(title), currentcpu(0.0) { log(""); }
   void log( const clipper::String& id );
   void log( const clipper::String& id, const clipper::MiniMol& mol, bool view );
-  void xml( const clipper::String& file, const clipper::MiniMol& mol );
+  clipper::String log( const clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, const clipper::MMoleculeSequence& seq );
+  void xml( const clipper::String& xml ) const;
   void profile();
  private:
+  struct cycdat { int nfrgs, nchns, nseq, nres, nmax, nunq; double cres, cchn; };
+  std::vector<cycdat> data;
   std::vector<std::pair<std::string,double> > prof;
+  clipper::String title_;
   double currentcpu;
 };
 

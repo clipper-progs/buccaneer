@@ -60,7 +60,7 @@ std::vector<int> Ca_join::best_chain( std::vector<Node>& nodes )
     }
   }
   // we've found all the long routes, now find the longest and back-trace it
-  float node_max = 0.0;
+  int node_max = 0;
   for ( int i = 1; i < node_score.size(); i++ )
     if ( node_score[i] > node_score[node_max] )
       node_max = i;

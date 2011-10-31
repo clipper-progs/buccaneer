@@ -11,7 +11,7 @@
 //! Class for tidying model
 class ModelTidy {
  public:
- ModelTidy( double rmsd = 1.0, double nmin = 12, bool verbose = false ) : rmsd_(rmsd), nmin_(nmin), verbose_(verbose) {}
+ ModelTidy( double rmsd = 1.0, int nmin = 12, bool verbose = false ) : rmsd_(rmsd), nmin_(nmin), verbose_(verbose) {}
   bool tidy( clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, const clipper::MMoleculeSequence& seq ) const;
 
   static std::vector<int> chain_renumber( clipper::MiniMol& mol, const clipper::MMoleculeSequence& seq );

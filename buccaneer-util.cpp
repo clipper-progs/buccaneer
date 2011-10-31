@@ -3,10 +3,12 @@
 
 #include "buccaneer-util.h"
 #include "buccaneer-prot.h"
+#include "buccaneer-tidy.h"
 
 #include <fstream>
 extern "C" {
 #include <stdlib.h>
+#include <stdio.h>
 }
 
 
@@ -134,29 +136,110 @@ void BuccaneerLog::log( const clipper::String& id, const clipper::MiniMol& mol, 
 }
 
 
-void BuccaneerLog::xml( const clipper::String& file, const clipper::MiniMol& mol )
+clipper::String BuccaneerLog::log( const clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, const clipper::MMoleculeSequence& seq )
 {
-  int nres, nseq, nchn, nmax;
-  nchn = mol.size();
-  nres = nseq = nmax = 0;
-  for ( int c = 0; c < mol.size(); c++ ) {
-    if ( mol[c].size() > nmax ) nmax = mol[c].size();
-    for ( int r = 0; r < mol[c].size(); r++ ) {
-      if ( mol[c][r].lookup( " CA ", clipper::MM::ANY ) >= 0 ) nres++;
-      if ( ProteinTools::residue_index_3( mol[c][r].type() ) >= 0 ) nseq++;
+  clipper::MiniMol mol_wrk = mol;
+  std::vector<int> seqnums = ModelTidy::chain_renumber( mol_wrk, seq );
+  std::vector<int> chnnums = ModelTidy::chain_assign( mol_wrk, mol_mr, seqnums, 1.0, 12 );
+  // model stats
+  int nres, nseq, nmax, nunq, nrch, nfrgs, nchns, nseqs;
+  nfrgs = mol_wrk.size();
+  nseqs = nchns = nres = nseq = nmax = nunq = nrch = 0;
+  // find out how many sequences and chains are present
+  for ( int c = 0; c < mol_wrk.size(); c++ ) {
+    nseqs = std::max( nseqs, seqnums[c]+1 );
+    nchns = std::max( nchns, chnnums[c]+1 );
+  }
+  // count residues
+  for ( int c = 0; c < mol_wrk.size(); c++ ) {
+    if ( mol_wrk[c].size() > nmax ) nmax = mol_wrk[c].size();
+    for ( int r = 0; r < mol_wrk[c].size(); r++ ) {
+      if ( mol_wrk[c][r].lookup( " CA ", clipper::MM::ANY ) >= 0 ) nres++;
+      if ( ProteinTools::residue_index_3( mol_wrk[c][r].type() ) >= 0 ) nseq++;
     }
   }
+  // count chain completeness
+  std::vector<std::vector<int> > seqcounts( nchns );
+  for ( int c = 0; c < mol_wrk.size(); c++ )
+    if ( chnnums[c] >= 0 && seqnums[c] >= 0 )
+      seqcounts[chnnums[c]].resize( seq[seqnums[c]].sequence().length(), 0 );
+  for ( int c = 0; c < mol_wrk.size(); c++ ) {
+    int nc = chnnums[c];
+    if ( nc >= 0 ) {
+      for ( int r = 0; r < mol_wrk[c].size(); r++ )
+	if ( mol_wrk[c][r].lookup( " CA ", clipper::MM::ANY ) >= 0 ) {
+	  int nr = mol_wrk[c][r].seqnum() - 1;
+	  if ( nr >= 0 && nr < seqcounts[nc].size() ) seqcounts[nc][nr]++;
+	}
+    }
+  }
+  for ( int nc = 0; nc < seqcounts.size(); nc++ )
+    for ( int nr = 0; nr < seqcounts[nc].size(); nr++ ) {
+      nrch++;
+      if ( seqcounts[nc][nr] == 1 ) nunq++;
+    }
+  double cres = double( nunq ) / double( nres );
+  double cchn = double( nunq ) / double( nrch );
+  /*
+  for ( int nc = 0; nc < seqcounts.size(); nc++ ) {
+    std::cout << nc << " ";
+    for ( int nr = 0; nr < seqcounts[nc].size(); nr++ )
+      std::cout << std::min( seqcounts[nc][nr],9 );
+    std::cout << std::endl;
+  }
+  */
+  // store
+  cycdat dat;
+  dat.nfrgs = nfrgs; dat.nchns = nchns;
+  dat.nseq = nseq; dat.nres = nres; dat.nmax = nmax; dat.nunq = nunq;
+  dat.cres = cres;
+  dat.cchn = cchn;
+  data.push_back( dat );
 
-  std::ofstream f;
-  f.open( file.c_str(), std::ios::out );
-  f << "<BuccaneerResult>" << std::endl;
-  f << "<ChainsBuilt>" << nchn << "</ChainsBuilt>" << std::endl;
-  f << "<ResiduesBuilt>" << nres << "</ResiduesBuilt>" << std::endl;
-  f << "<ResiduesSequenced>" << nseq << "</ResiduesSequenced>" << std::endl;
-  f << "<ResiduesLongestChain>" << nmax << "</ResiduesLongestChain>" << std::endl;
-  f << "</BuccaneerResult>" << std::endl;
-  f.close();
+  // standard output
+  char s[1000];
+  sprintf( s, " %6i residues were built in %3i fragments, the longest having %4i residues.\n %6i residues were sequenced, after pruning.\n %6i residues were uniquely allocated to %3i chains.\n  Completeness by residues built:   %5.1f%%\n  Completeness of chains (number):  %5.1f%%    (%i)\n", nres, nfrgs, nmax, nseq, nunq, nchns, 100.0*cres, 100.0*cchn, nchns );
+  return clipper::String(s);
+}
 
+
+void BuccaneerLog::xml( const clipper::String& xml ) const
+{
+  // xml output
+  clipper::String xmltmp = xml+".tmp";
+  FILE *f = fopen( xmltmp.c_str(), "w" );
+  if ( f == NULL ) clipper::Message::message( clipper::Message_fatal( "Error: Could not open xml temporary file: "+xmltmp ) );
+  fprintf( f, "<BuccaneerResult>\n" );
+  fprintf( f, " <Title>%s</Title>\n", title_.c_str() );
+  fprintf( f, " <Cycles>\n" );
+  for ( int c = 0; c < data.size(); c++ ) {
+    fprintf( f, "  <Cycle>\n" );
+    fprintf( f, "   <Number>%i</Number>\n", c+1 );
+    fprintf( f, "   <CompletenessByResiduesBuilt>%f</CompletenessByResiduesBuilt>\n", data[c].cres );
+    fprintf( f, "   <CompletenessByChainsBuilt>%f</CompletenessByChainsBuilt>\n", data[c].cchn );
+    fprintf( f, "   <ChainsBuilt>%i</ChainsBuilt>\n", data[c].nchns );
+    fprintf( f, "   <FragmentsBuilt>%i</FragmentsBuilt>\n", data[c].nfrgs );
+    fprintf( f, "   <ResiduesUnique>%i</ResiduesUnique>\n", data[c].nunq );
+    fprintf( f, "   <ResiduesBuilt>%i</ResiduesBuilt>\n", data[c].nres );
+    fprintf( f, "   <ResiduesSequenced>%i</ResiduesSequenced>\n", data[c].nseq );
+    fprintf( f, "   <ResiduesLongestFragment>%i</ResiduesLongestFragment>\n", data[c].nmax );
+    fprintf( f, "  </Cycle>\n" );
+  }
+  fprintf( f, " </Cycles>\n" );
+  fprintf( f, " <Final>\n" );
+  int c = data.size()-1;
+  fprintf( f, "  <CompletenessByResiduesBuilt>%f</CompletenessByResiduesBuilt>\n", data[c].cres );
+  fprintf( f, "  <CompletenessByChainsBuilt>%f</CompletenessByChainsBuilt>\n", data[c].cchn );
+  fprintf( f, "  <ChainsBuilt>%i</ChainsBuilt>\n", data[c].nchns );
+  fprintf( f, "  <FragmentsBuilt>%i</FragmentsBuilt>\n", data[c].nfrgs );
+  fprintf( f, "  <ResiduesUnique>%i</ResiduesUnique>\n", data[c].nunq );
+  fprintf( f, "  <ResiduesBuilt>%i</ResiduesBuilt>\n", data[c].nres );
+  fprintf( f, "  <ResiduesSequenced>%i</ResiduesSequenced>\n", data[c].nseq );
+  fprintf( f, "  <ResiduesLongestFragment>%i</ResiduesLongestFragment>\n", data[c].nmax );
+  fprintf( f, " </Final>\n" );
+  fprintf( f, "</BuccaneerResult>\n" );
+  fclose(f);
+  rename( xmltmp.c_str(), xml.c_str() );
 }
 
 

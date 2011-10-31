@@ -27,7 +27,7 @@ extern "C" {
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.5.1", "$Date: 2010/10/18" );
+  CCP4Program prog( "cbuccaneer", "1.5.2", "$Date: 2011/10/06" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2010 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -114,6 +114,8 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) oppdb = args[arg];
     } else if ( key == "-mapout" ) {
       if ( ++arg < args.size() ) opmap  = args[arg];
+    } else if ( key == "-xmlout" ) {
+      if ( ++arg < args.size() ) opxml  = args[arg];
     } else if ( key == "-colin-ref-fo" ) {
       if ( ++arg < args.size() ) ipcol_ref_fo = args[arg];
     } else if ( key == "-colin-ref-hl" ) {
@@ -206,7 +208,7 @@ int main( int argc, char** argv )
     }
   }
   if ( args.size() <= 1 ) {
-    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-known-structure <atomid[,radius]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input model is extended.\n";
+    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-xmlout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-known-structure <atomid[,radius]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input model is extended.\n";
     exit(1);
   }
 
@@ -240,7 +242,7 @@ int main( int argc, char** argv )
     find=grow=join=link=seqnc=corct=filtr=ncsbd=prune=build=true;
   if ( ipmtz_ref == "NONE" || ippdb_ref == "NONE" )
     BuccaneerUtil::set_reference( ipmtz_ref, ippdb_ref );
-  BuccaneerLog log;
+  BuccaneerLog log( title );
   std::cout << std::endl;
 
   // Get resolution for calculation
@@ -515,27 +517,14 @@ int main( int argc, char** argv )
       // user output
       std::cout << std::endl;
       if ( verbose > 7 ) std::cout << history << std::endl;
-      int nres, nseq, nchn, nmax;
-      nchn = mol_wrk.size();
-      nres = nseq = nmax = 0;
-      for ( int c = 0; c < mol_wrk.size(); c++ ) {
-	if ( mol_wrk[c].size() > nmax ) nmax = mol_wrk[c].size();
-	for ( int r = 0; r < mol_wrk[c].size(); r++ ) {
-	  if ( mol_wrk[c][r].lookup( " CA ", clipper::MM::ANY ) >= 0 ) nres++;
-	  if ( ProteinTools::residue_index_3( mol_wrk[c][r].type() ) >= 0 ) nseq++;
-	}
-      }
+      msg = log.log( mol_wrk, mol_mr, seq_wrk );
       prog.summary_beg();
-      std::cout << "Internal cycle " << clipper::String( cyc+1, 3 ) << std::endl;
-      msg = ( clipper::String( nres, 5 ) + " residues were built in " +
-	      clipper::String( nchn, 2 ) + " chains, the longest having " +
-	      clipper::String( nmax, 4 ) + " residues." + "\n" +
-	      clipper::String( nseq, 5 ) + " residues were sequenced, " +
-	      "after pruning.\n" );
-      std::cout << msg << std::endl;
+      std::cout << "Internal cycle " << clipper::String( cyc+1, 3 )
+		<< std::endl << msg << std::endl;
       prog.summary_end();
 
-      // temporary file output
+      // file output
+      if ( opxml != "NONE" ) log.xml( opxml );
       if ( optemp ) {
 	clipper::String c( cyc, 1 );
 	clipper::MMDBfile mmdb;
@@ -571,7 +560,6 @@ int main( int argc, char** argv )
     mmdb.write_file( oppdb );
   }
 
-  if ( opxml != "NONE" ) log.xml( opxml, mol_wrk );
   std::cout << "$TEXT:Result: $$ $$" << std::endl << msg << "$$" << std::endl;
   log.profile();
   prog.set_termination_message( "Normal termination" );
