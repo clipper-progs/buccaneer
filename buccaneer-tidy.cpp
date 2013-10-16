@@ -75,13 +75,14 @@ std::vector<int> ModelTidy::assign_chains( const clipper::MiniMol& mol, const cl
   // set up chain numbers
   const double rad = 5.0;
   clipper::MAtomNonBond nb( mol_mr, rad );
+  std::vector<int> srcnums( nsrc );
+  for ( int c2 = 0; c2 < nsrc; c2++ ) srcnums[c2] = c2;
 
   // count references
-  std::vector<int> chnnums( nchn );
-  for ( int c1 = 0; c1 < nchn; c1++ ) chnnums[c1] = c1;
+  std::vector<int> chnnums( nchn, -1 );
   for ( int c1 = 0; c1 < nchn; c1++ ) {
     std::vector<int> refcount =
-      count_contacts( nb, mol_mr, chnnums, mol[c1], rad );
+      count_contacts( nb, mol_mr, srcnums, mol[c1], rad );
     int c = 0;
     for ( int c2 = 0; c2 < nsrc; c2++ )
       if ( refcount[c2] > refcount[c] ) c = c2;
@@ -327,7 +328,7 @@ bool ModelTidy::update_model( clipper::MiniMol& mol, const clipper::MiniMol& mol
 
   // current number of chains
   const int nchn = mol.size();
-  // ideal number  of chains (chnnums)
+  // ideal number of chains (chnnums)
   int nsrc = 0;
   for ( int i = 0; i < chnnums.size(); i++ )
     nsrc = std::max( nsrc, chnnums[i]+1 );
@@ -355,7 +356,7 @@ bool ModelTidy::update_model( clipper::MiniMol& mol, const clipper::MiniMol& mol
       int c1 = srcsort[i].second;
       for ( int r1 = 0; r1 < mol[c1].size(); r1++ )
 	mp.insert( mol[c1][r1] );
-      if ( verbose_ ) std::cout << "Adding chain " << mol[c1].id() << " to chain " << c1 << std::endl;
+      if ( verbose_ ) std::cout << "Adding chain " << mol[c1].id() << " to chain " << c2 << " " << mp.id() << std::endl;
     }
 
     // record chain gaps
