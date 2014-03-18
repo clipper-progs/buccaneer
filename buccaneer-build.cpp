@@ -7,11 +7,6 @@
 
 #include <algorithm>
 
-#ifdef scr1 // defined on Windows
-# undef scr1
-# undef scr2
-#endif
-
 
 void Ca_build::build_rotate_rotamer( clipper::MMonomer& mm, int nr, int nc )
 {
@@ -270,22 +265,22 @@ void Ca_build::fix_clash  ( clipper::MMonomer& m1, clipper::MMonomer& m2, const 
     mm2[i2].set_coord_orth( cf2.coord_orth( cell ) );
   }
   // fetch the rotamer scores
-  std::vector<std::pair<double,std::pair<int,int> > > scr1, scr2;
-  scr1 = score_rotamers( mm1, xmap, xstat, 5 );
-  scr2 = score_rotamers( mm2, xmap, xstat, 5 );
+  std::vector<std::pair<double,std::pair<int,int> > > score1, score2;
+  score1 = score_rotamers( mm1, xmap, xstat, 5 );
+  score2 = score_rotamers( mm2, xmap, xstat, 5 );
   // now search over orientations
   double smin = 1.0e9;
   int r1min, r2min;
   r1min = r2min = -1;
-  for ( int r1 = 0; r1 < scr1.size(); r1++ ) {
-    for ( int r2 = 0; r2 < scr2.size(); r2++ ) {
+  for ( int r1 = 0; r1 < score1.size(); r1++ ) {
+    for ( int r2 = 0; r2 < score2.size(); r2++ ) {
       // if this combination gives a viable score, check for clashes...
-      double s = scr1[r1].first + scr2[r2].first;
+      double s = score1[r1].first + score2[r2].first;
       if ( s < smin ) {
-	build_rotate_rotamer( mm1, scr1[r1].second.first,
-			           scr1[r1].second.second );
-	build_rotate_rotamer( mm2, scr2[r2].second.first,
-			           scr2[r2].second.second );
+	build_rotate_rotamer( mm1, score1[r1].second.first,
+			           score1[r1].second.second );
+	build_rotate_rotamer( mm2, score2[r2].second.first,
+			           score2[r2].second.second );
 	double d2min = 1.0e9;
 	for ( int a1 = 0; a1 < mm1.size(); a1++ )
 	  for ( int a2 = 0; a2 < mm2.size(); a2++ ) {
@@ -305,10 +300,10 @@ void Ca_build::fix_clash  ( clipper::MMonomer& m1, clipper::MMonomer& m2, const 
 
   // rebuild
   if ( r1min >= 0 && r2min >= 0 ) {
-    build_rotate_rotamer( m1, scr1[r1min].second.first,
-			      scr1[r1min].second.second );
-    build_rotate_rotamer( m2, scr2[r2min].second.first,
-			      scr2[r2min].second.second );
+    build_rotate_rotamer( m1, score1[r1min].second.first,
+			      score1[r1min].second.second );
+    build_rotate_rotamer( m2, score2[r2min].second.first,
+			      score2[r2min].second.second );
   }
   m1.set_type( oldrestype1 );
   m2.set_type( oldrestype2 );

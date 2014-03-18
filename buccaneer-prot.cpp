@@ -37,8 +37,8 @@ clipper::RTop_orth Ca_group::rtop_from_std_ori() const
   const clipper::Vec3<> v3( clipper::Vec3<>::cross(v1,v2).unit() );
   return
     clipper::RTop_orth( clipper::Mat33<>( v1[0], v2[0], v3[0],
-					  v1[1], v2[1], v3[1],
-					  v1[2], v2[2], v3[2] ), coord_ca() );
+                                          v1[1], v2[1], v3[1],
+                                          v1[2], v2[2], v3[2] ), coord_ca() );
 }
 
 clipper::RTop_orth Ca_group::rtop_beta_carbon() const
@@ -125,8 +125,8 @@ clipper::RTop_orth Pr_group::rtop_from_std_ori() const
   const clipper::Vec3<> v3( clipper::Vec3<>::cross(v1,v2).unit() );
   return
     clipper::RTop_orth( clipper::Mat33<>( v1[0], v2[0], v3[0],
-					  v1[1], v2[1], v3[1],
-					  v1[2], v2[2], v3[2] ), cen );
+                                          v1[1], v2[1], v3[1],
+                                          v1[2], v2[2], v3[2] ), cen );
 }
 
 Pr_group Pr_group::next_pr_group( const clipper::ftype& phi, const clipper::ftype& psi ) const
@@ -189,21 +189,21 @@ std::vector<ProteinLoop::CoordList<5> > ProteinLoop::rebuild5atoms( const clippe
       r[2] = ca2s[ipsi1];
       double psi1 = Coord_orth::torsion( n1, ca1, r[0], r[2] );
       if ( rama.allowed( phi1, psi1 ) ) {
-	// build n2
-	r[1] = Coord_orth( n1, ca1, r[0], 1.33, 1.99, psi1 );
-	// find 2 possible positions for c2
-	std::vector<Coord_orth> cc2s = constrained_coords( r[2], r[2]-r[1], 1.53, 1.22, ca3, 2.43 );
-	for ( int iphi2 = 0; iphi2 < cc2s.size(); iphi2++ ) {
-	  // build c2, n3
-	  r[3] = cc2s[iphi2];
-	  double phi2 = Coord_orth::torsion( r[0], r[1], r[2], r[3] );
-	  double psi2 = Coord_orth::torsion( r[1], r[2], r[3], ca3 );
-	  if ( rama.allowed( phi2, psi2 ) ) {
-	    r[4] = Coord_orth( r[1], r[2], r[3], 1.33, 1.99, psi2 );
-	    double ang = Coord_orth::angle( r[4], ca3, c3 );
-	    if ( ang > 1.75 && ang < 2.10 ) result.push_back( r );
-	  }
-	}
+        // build n2
+        r[1] = Coord_orth( n1, ca1, r[0], 1.33, 1.99, psi1 );
+        // find 2 possible positions for c2
+        std::vector<Coord_orth> cc2s = constrained_coords( r[2], r[2]-r[1], 1.53, 1.22, ca3, 2.43 );
+        for ( int iphi2 = 0; iphi2 < cc2s.size(); iphi2++ ) {
+          // build c2, n3
+          r[3] = cc2s[iphi2];
+          double phi2 = Coord_orth::torsion( r[0], r[1], r[2], r[3] );
+          double psi2 = Coord_orth::torsion( r[1], r[2], r[3], ca3 );
+          if ( rama.allowed( phi2, psi2 ) ) {
+            r[4] = Coord_orth( r[1], r[2], r[3], 1.33, 1.99, psi2 );
+            double ang = Coord_orth::angle( r[4], ca3, c3 );
+            if ( ang > 1.75 && ang < 2.10 ) result.push_back( r );
+          }
+        }
       }
     }
   }
@@ -226,14 +226,14 @@ std::vector<ProteinLoop::CoordList<8> > ProteinLoop::rebuild8atoms( const clippe
     for ( int ipsi1 = 0; ipsi1 < ntor; ipsi1++ ) {
       double psi1 = dtor * double( ipsi1 );
       if ( rama.allowed( phi1, psi1 ) ) {
-	r[0] = Coord_orth(  c0,   n1,  ca1, 1.53, 1.92, phi1 );
-	r[1] = Coord_orth(  n1,  ca1, r[0], 1.33, 1.99, psi1 );
-	r[2] = Coord_orth( ca1, r[0], r[1], 1.47, 2.15, pi   );
-	r5 = rebuild5atoms( r[0], r[1], r[2], ca4, c4, n5 );
-	for ( int i = 0; i < r5.size(); i++ ) {
-	  for ( int j = 0; j < 5; j++ ) r[j+3] = r5[i][j];
-	  result.push_back(r);
-	}
+        r[0] = Coord_orth(  c0,   n1,  ca1, 1.53, 1.92, phi1 );
+        r[1] = Coord_orth(  n1,  ca1, r[0], 1.33, 1.99, psi1 );
+        r[2] = Coord_orth( ca1, r[0], r[1], 1.47, 2.15, pi   );
+        r5 = rebuild5atoms( r[0], r[1], r[2], ca4, c4, n5 );
+        for ( int i = 0; i < r5.size(); i++ ) {
+          for ( int j = 0; j < 5; j++ ) r[j+3] = r5[i][j];
+          result.push_back(r);
+        }
       }
     }
   }
@@ -315,14 +315,14 @@ std::pair<int,int> ProteinTools::chain_sequence_match( const clipper::String& ch
     for ( int off = -lenc+bestscr; off < lens-bestscr; off++ ) {
       int scr = 0;
       for ( int i = 0; i < seqs[chn].length(); i++ )
-	if ( i-off >= 0 && i-off < chnseq.length() )
-	  if ( seqs[chn][i] == chnseq[i-off] )
-	    if ( isupper(chnseq[i-off]) )
-	      scr++;
+        if ( i-off >= 0 && i-off < chnseq.length() )
+          if ( seqs[chn][i] == chnseq[i-off] )
+            if ( isupper(chnseq[i-off]) )
+              scr++;
       if ( scr > bestscr ) {
-	bestchn = chn;
-	bestoff = off;
-	bestscr = scr;
+        bestchn = chn;
+        bestoff = off;
+        bestscr = scr;
       }
     }
   }
@@ -354,8 +354,8 @@ clipper::RTop_orth ProteinTools::superpose( const clipper::MPolymer& mp1, const 
     int i2 = v1[i1];
     if ( i2 >= 0 && i2 < seq2.size() )
       if ( isupper(seq1[i1]) && isupper(seq2[i2]) ) {
-	if ( seq1[i1] == seq2[i2] ) nmat++;
-	else                        nmis++;
+        if ( seq1[i1] == seq2[i2] ) nmat++;
+        else                        nmis++;
       }
   }
   if ( nmat < nmatch || nmis > nmismatch ) return result;
@@ -375,12 +375,12 @@ clipper::RTop_orth ProteinTools::superpose( const clipper::MPolymer& mp1, const 
     int i2 = v1[i1];
     if ( i2 >= 0 && i2 < seq2.size() )
       if ( isupper(seq1[i1]) && isupper(seq2[i2]) && seq1[i1] == seq2[i2] ) {
-	int a1 = mp1[i1].lookup( " CA ", clipper::MM::ANY );
-	int a2 = mp2[i2].lookup( " CA ", clipper::MM::ANY );
-	if ( a1 >= 0 && a2 >= 0 ) {
-	  c1.push_back( mp1[i1][a1].coord_orth() );
-	  c2.push_back( mp2[i2][a2].coord_orth() );
-	}
+        int a1 = mp1[i1].lookup( " CA ", clipper::MM::ANY );
+        int a2 = mp2[i2].lookup( " CA ", clipper::MM::ANY );
+        if ( a1 >= 0 && a2 >= 0 ) {
+          c1.push_back( mp1[i1][a1].coord_orth() );
+          c2.push_back( mp2[i2][a2].coord_orth() );
+        }
       }
   }
 
@@ -443,7 +443,7 @@ bool ProteinTools::chain_label( clipper::MiniMol& mol )
     clipper::String newlabels;
     for ( int j = 0; j < labels[i].length(); j++ )
       if ( chainids.find( labels[i].substr(j,1) ) == clipper::String::npos )
-	newlabels += labels[i].substr(j,1);
+        newlabels += labels[i].substr(j,1);
     labels[i] = newlabels;
   }
 
@@ -452,8 +452,8 @@ bool ProteinTools::chain_label( clipper::MiniMol& mol )
   for ( int chn = 0; chn < mol.size(); chn++ ) {
     if ( label < labels[0].length() ) {
       if ( mol[chn].id() == "" ) {
-	mol[chn].set_id( labels[0].substr( label, 1 ) );
-	label++;
+        mol[chn].set_id( labels[0].substr( label, 1 ) );
+        label++;
       }
     } else {
       int c = label - labels[0].length();
@@ -461,7 +461,7 @@ bool ProteinTools::chain_label( clipper::MiniMol& mol )
       int c2 = c / labels[1].length();
       mol[chn].set_id( labels[1].substr( c1, 1 ) );
       for ( int res = 0; res < mol[chn].size(); res++ )
-	mol[chn][res].set_seqnum( res + 1 + 1000*c2 );
+        mol[chn][res].set_seqnum( res + 1 + 1000*c2 );
       label++;
     }
   }
@@ -489,31 +489,31 @@ bool ProteinTools::copy_residue_types( clipper::MiniMol& target, const clipper::
     for ( int r2 = 0; r2 < target[c2].size(); r2++ ) {
       int a2 = target[c2][r2].lookup( " CA ", clipper::MM::ANY );
       if ( a2 >= 0 ) {
-	// find source atom near target atom
-	f2 = target[c2][r2][a2].coord_orth().coord_frac(cell);
-	atoms = nb.atoms_near( f2.coord_orth(cell), dmin );
-	for ( int i = 0; i < atoms.size(); i++ ) {
-	  const int c1 = atoms[i].polymer();
-	  const int r1 = atoms[i].monomer();
-	  const int a1 = atoms[i].atom();
-	  if ( sourca[c1][r1][a1].id() == " CA " ) {
-	    f1 = sourca[c1][r1][a1].coord_orth().coord_frac(cell);
-	    f1 = spgr.symop(atoms[i].symmetry()) * f1;
-	    f1 = f1.lattice_copy_near( f2 );
-	    double d2 = ( f2 - f1 ).lengthsq( cell );
-	    // if distance < 1A
-	    if ( d2 < d2min ) {
-	      // copy residue type
-	      if ( sourca[c1][r1].type() != "UNK" &&
-		   target[c2][r2].type() == "UNK" )
-		target[c2][r2].set_type( sourca[c1][r1].type() );
-	      // copy sequence data
-	      if ( sourca[c1][r1].exists_property( "SEQDAT" ) &&
-		   !target[c2][r2].exists_property( "SEQDAT" ) )
-		target[c2][r2].set_property( "SEQDAT", static_cast<const clipper::Property<Ca_sequence::Sequence_data>&>( sourca[c1][r1].get_property( "SEQDAT" ) ) );
-	    }
-	  }
-	}
+        // find source atom near target atom
+        f2 = target[c2][r2][a2].coord_orth().coord_frac(cell);
+        atoms = nb.atoms_near( f2.coord_orth(cell), dmin );
+        for ( int i = 0; i < atoms.size(); i++ ) {
+          const int c1 = atoms[i].polymer();
+          const int r1 = atoms[i].monomer();
+          const int a1 = atoms[i].atom();
+          if ( sourca[c1][r1][a1].id() == " CA " ) {
+            f1 = sourca[c1][r1][a1].coord_orth().coord_frac(cell);
+            f1 = spgr.symop(atoms[i].symmetry()) * f1;
+            f1 = f1.lattice_copy_near( f2 );
+            double d2 = ( f2 - f1 ).lengthsq( cell );
+            // if distance < 1A
+            if ( d2 < d2min ) {
+              // copy residue type
+              if ( sourca[c1][r1].type() != "UNK" &&
+                   target[c2][r2].type() == "UNK" )
+                target[c2][r2].set_type( sourca[c1][r1].type() );
+              // copy sequence data
+              if ( sourca[c1][r1].exists_property( "SEQDAT" ) &&
+                   !target[c2][r2].exists_property( "SEQDAT" ) )
+                target[c2][r2].set_property( "SEQDAT", static_cast<const clipper::Property<Ca_sequence::Sequence_data>&>( sourca[c1][r1].get_property( "SEQDAT" ) ) );
+            }
+          }
+        }
       }
     }
 
@@ -522,18 +522,18 @@ bool ProteinTools::copy_residue_types( clipper::MiniMol& target, const clipper::
     int res = 0;
     while( res < target[chn].size() ) {
       while( res < target[chn].size() ) {
-	if ( target[chn][res].type() != "UNK" ) break;
-	res++;
+        if ( target[chn][res].type() != "UNK" ) break;
+        res++;
       }
       int res0 = res;
       while( res < target[chn].size() ) {
-	if ( target[chn][res].type() == "UNK" ) break;
-	res++;
+        if ( target[chn][res].type() == "UNK" ) break;
+        res++;
       }
       int res1 = res;
       if ( res1 - res0 < 6 )
-	for ( int r = res0; r < res1; r++ )
-	  target[chn][r].set_type( "UNK" );
+        for ( int r = res0; r < res1; r++ )
+          target[chn][r].set_type( "UNK" );
     }
   }
 
@@ -553,44 +553,44 @@ bool ProteinTools::globularise( clipper::MiniMol& mol, const clipper::Coord_frac
     for ( int res = 0; res < mol[chn].size(); res++ ) {
       bool chnbrk;
       if ( res == mol[chn].size()-1 )
-	chnbrk = true;
+        chnbrk = true;
       else
-	chnbrk = !Mm::protein_peptide_bond( mol[chn][res], mol[chn][res+1] );
+        chnbrk = !Mm::protein_peptide_bond( mol[chn][res], mol[chn][res+1] );
       if ( chnbrk ) {
-	// process res0...res
-	// get COM of current chain
-	clipper::Coord_orth co( 0.0, 0.0, 0.0 );
-	double no = 0.0;
-	for ( int r1 = res0; r1 <= res; r1++ )
-	  for ( int a1 = 0; a1 < mol[chn][r1].size(); a1++ ) {
-	    co += mol[chn][r1][a1].coord_orth();
-	    no += 1.0;
-	  }
-	co = (1.0/no) * co;
-	cf1 = co.coord_frac( cell );
-	// find symop and lattice shift which brings it close to cent
-	double r2min = 1.0e9;
-	int symin = 0;
-	cfmin = clipper::Coord_frac( 0.0, 0.0, 0.0 );
-	for ( int s = 0; s < spgr.num_symops(); s++ ) {
-	  cf2 = spgr.symop(s) * cf1;
-	  cf3 = cf2.lattice_copy_near( cent );
-	  double r2 = (cf3-cent).lengthsq(cell);
-	  if ( r2 < r2min ) {
-	    r2min = r2;
-	    symin = s;
-	    cfmin = cf3 - cf2;
-	  }
-	}
-	// apply the shifts
-	for ( int r1 = res0; r1 <= res; r1++ )
-	  for ( int a1 = 0; a1 < mol[chn][r1].size(); a1++ ) {
-	    cf1 = mol[chn][r1][a1].coord_orth().coord_frac( cell );
-	    cf1 = spgr.symop(symin) * cf1 + cfmin;
-	    mol[chn][r1][a1].set_coord_orth( cf1.coord_orth( cell ) );
-	  }
-	// done processing
-	res0 = res+1;
+        // process res0...res
+        // get COM of current chain
+        clipper::Coord_orth co( 0.0, 0.0, 0.0 );
+        double no = 0.0;
+        for ( int r1 = res0; r1 <= res; r1++ )
+          for ( int a1 = 0; a1 < mol[chn][r1].size(); a1++ ) {
+            co += mol[chn][r1][a1].coord_orth();
+            no += 1.0;
+          }
+        co = (1.0/no) * co;
+        cf1 = co.coord_frac( cell );
+        // find symop and lattice shift which brings it close to cent
+        double r2min = 1.0e9;
+        int symin = 0;
+        cfmin = clipper::Coord_frac( 0.0, 0.0, 0.0 );
+        for ( int s = 0; s < spgr.num_symops(); s++ ) {
+          cf2 = spgr.symop(s) * cf1;
+          cf3 = cf2.lattice_copy_near( cent );
+          double r2 = (cf3-cent).lengthsq(cell);
+          if ( r2 < r2min ) {
+            r2min = r2;
+            symin = s;
+            cfmin = cf3 - cf2;
+          }
+        }
+        // apply the shifts
+        for ( int r1 = res0; r1 <= res; r1++ )
+          for ( int a1 = 0; a1 < mol[chn][r1].size(); a1++ ) {
+            cf1 = mol[chn][r1][a1].coord_orth().coord_frac( cell );
+            cf1 = spgr.symop(symin) * cf1 + cfmin;
+            mol[chn][r1][a1].set_coord_orth( cf1.coord_orth( cell ) );
+          }
+        // done processing
+        res0 = res+1;
       }
     }
   }
@@ -607,10 +607,10 @@ bool ProteinTools::globularise( clipper::MiniMol& mol )
     double no = 0.0;
     for ( int chn = 0; chn < mol.size(); chn++ )
       for ( int res = 0; res < mol[chn].size(); res++ )
-	for ( int atm = 0; atm < mol[chn][res].size(); atm++ ) {
-	  co += mol[chn][res][atm].coord_orth();
-	  no += 1.0;
-	}
+        for ( int atm = 0; atm < mol[chn][res].size(); atm++ ) {
+          co += mol[chn][res][atm].coord_orth();
+          no += 1.0;
+        }
     co = (1.0/no) * co;
     clipper::Coord_frac cf = co.coord_frac( mol.cell() );
     // globularise about it
@@ -666,8 +666,8 @@ bool ProteinTools::symm_match( clipper::MiniMol& molwrk, const clipper::MiniMol&
       clipper::RTop_orth rtop = spgr.symop(sym).rtop_orth( cell );
       clipper::Coord_orth cow( 0.0, 0.0, 0.0 );
       for ( int a = 0; a < atomw.size(); a++ ) {
-	atomw[a].transform( rtop );
-	cow += atomw[a].coord_orth();
+        atomw[a].transform( rtop );
+        cow += atomw[a].coord_orth();
       }
       if ( atomw.size() > 0 ) cow = (1.0/double(atomw.size())) * cow;
       clipper::Coord_frac cfw = cow.coord_frac( cell );
@@ -676,24 +676,24 @@ bool ProteinTools::symm_match( clipper::MiniMol& molwrk, const clipper::MiniMol&
 
       // try offsets
       for ( double du = 0.0; du <= 1.01; du += 1.0 )
-	for ( double dv = 0.0; dv < 1.01; dv += 1.0 )
-	  for ( double dw = 0.0; dw < 1.01; dw += 1.0 ) {
-	    clipper::Coord_frac off( rint( off0.u() ) + du,
-				     rint( off0.v() ) + dv,
-				     rint( off0.w() ) + dw );
-	    clipper::Coord_orth ofo = off.coord_orth( cell );
-	    double scr = 0.0;
-	    for ( int a = 0; a < atomw.size(); a++ ) {
-	      clipper::Coord_orth coa = atomw[a].coord_orth() + ofo;
-	      clipper::Coord_grid cga = nxflt.coord_map( coa ).coord_grid();
-	      if ( nxflt.in_map( cga ) ) scr += nxflt.get_data( cga );
-	    }
-	    if ( scr > bestscr ) {
-	      bestscr = scr;
-	      bestsym = sym;
-	      bestoff = off;
-	    }
-	  }
+        for ( double dv = 0.0; dv < 1.01; dv += 1.0 )
+          for ( double dw = 0.0; dw < 1.01; dw += 1.0 ) {
+            clipper::Coord_frac off( rint( off0.u() ) + du,
+                                     rint( off0.v() ) + dv,
+                                     rint( off0.w() ) + dw );
+            clipper::Coord_orth ofo = off.coord_orth( cell );
+            double scr = 0.0;
+            for ( int a = 0; a < atomw.size(); a++ ) {
+              clipper::Coord_orth coa = atomw[a].coord_orth() + ofo;
+              clipper::Coord_grid cga = nxflt.coord_map( coa ).coord_grid();
+              if ( nxflt.in_map( cga ) ) scr += nxflt.get_data( cga );
+            }
+            if ( scr > bestscr ) {
+              bestscr = scr;
+              bestsym = sym;
+              bestoff = off;
+            }
+          }
     }
     // now transform using the best operator
     clipper::Coord_orth cot = bestoff.coord_orth( cell );
@@ -717,11 +717,45 @@ std::vector<float> ProteinTools::main_chain_densities( const clipper::MPolymer& 
     for ( int i = 0; i < 3; i++ ) {
       int atm = mp[res].lookup( atms[i], clipper::MM::ANY );
       if ( atm >= 0 ) {
-	clipper::Coord_orth co = mp[res][atm].coord_orth();
-	clipper::Coord_frac cf = co.coord_frac( xmap.cell() );
-	double r = xmap.interp<clipper::Interp_cubic>( cf );
-	t0 += 1.0;
-	t1 += r;
+        clipper::Coord_orth co = mp[res][atm].coord_orth();
+        clipper::Coord_frac cf = co.coord_frac( xmap.cell() );
+        double r = xmap.interp<clipper::Interp_cubic>( cf );
+        t0 += 1.0;
+        t1 += r;
+      }
+    }
+    if ( t0 > 0.5 ) scores[res] = t1 / t0;
+  }
+
+  // smooth if required
+  for ( int i = 0; i < nsmooth; i++ ) {
+    int n = scores.size();
+    std::vector<float> smooth( n );
+    smooth[ 0 ] = 0.25*( 3.0*scores[0] + scores[1] );
+    for ( int i = 1; i < n-1; i++ )
+      smooth[i] = 0.25*( scores[i-1] + 2.0*scores[i] + scores[i+1] );
+    smooth[n-1] = 0.25*( scores[n-2] + 3.0*scores[n-1] );
+    scores = smooth;
+  }
+
+  return scores;
+}
+
+
+std::vector<float> ProteinTools::main_chain_u_values( const clipper::MPolymer& mp, int nsmooth )
+{
+  const char atms[3][5] = { " N  ", " CA ", " C  " };
+  // calculate mean U for each residue
+  std::vector<float> scores( mp.size(), 100.0 );
+  double t0, t1;
+  for ( int res = 0; res < mp.size(); res++ ) {
+    t0 = t1 = 0.0;
+    for ( int i = 0; i < 3; i++ ) {
+      int atm = mp[res].lookup( atms[i], clipper::MM::ANY );
+      if ( atm >= 0 ) {
+        double r = mp[res][atm].u_iso();
+        t0 += 1.0;
+        t1 += r;
       }
     }
     if ( t0 > 0.5 ) scores[res] = t1 / t0;
@@ -754,10 +788,10 @@ bool ProteinTools::split_chains_at_gap( clipper::MiniMol& mol )
     for ( int res = 0; res < mol[chn].size(); res++ ) {
       mp.insert( mol[chn][res] );
       if ( res < mol[chn].size()-1 )
-	if ( !Mm::protein_peptide_bond(mol[chn][res],mol[chn][res+1]) ) {
-	  target.insert( mp );
-	  mp = mpnull;
-	}
+        if ( !Mm::protein_peptide_bond(mol[chn][res],mol[chn][res+1]) ) {
+          target.insert( mp );
+          mp = mpnull;
+        }
     }
     if ( mp.size() > 0 ) target.insert( mp );
   }
@@ -790,22 +824,22 @@ bool ProteinTools::split_chains_at_unk( clipper::MiniMol& mol, const clipper::Xm
     }
     while( res < mol[chn].size() ) {
       while( res < mol[chn].size() ) {
-	if ( mol[chn][res].type() == "UNK" ) break;
-	res++;
+        if ( mol[chn][res].type() == "UNK" ) break;
+        res++;
       }
       int res0 = res;
       while( res < mol[chn].size() ) {
-	if ( mol[chn][res].type() != "UNK" ) break;
-	res++;
+        if ( mol[chn][res].type() != "UNK" ) break;
+        res++;
       }
       int res1 = res;
       if ( res1 < mol[chn].size() ) {
-	int resm = res0;  // find the weakest residues to delete
-	for ( int r = res0; r < res1; r++ )
-	  if ( scores[r] < scores[resm] ) resm = r;
-	mol[chn][resm].set_type( "~~~" );
-	if ( resm-1 >= res0 ) mol[chn][resm-1].set_type( "~~~" );
-	if ( resm+1 <  res1 ) mol[chn][resm+1].set_type( "~~~" );
+        int resm = res0;  // find the weakest residues to delete
+        for ( int r = res0; r < res1; r++ )
+          if ( scores[r] < scores[resm] ) resm = r;
+        mol[chn][resm].set_type( "~~~" );
+        if ( resm-1 >= res0 ) mol[chn][resm-1].set_type( "~~~" );
+        if ( resm+1 <  res1 ) mol[chn][resm+1].set_type( "~~~" );
       }
     }
   }
@@ -816,10 +850,10 @@ bool ProteinTools::split_chains_at_unk( clipper::MiniMol& mol, const clipper::Xm
     mp = mpnull;
     for ( int res = 0; res < mol[chn].size(); res++ ) {
       if ( mol[chn][res].type() != "~~~" ) {
-	mp.insert( mol[chn][res] );
+        mp.insert( mol[chn][res] );
       } else {
-	if ( mp.size() > 5 ) mol2.insert( mp );
-	mp = mpnull;
+        if ( mp.size() > 5 ) mol2.insert( mp );
+        mp = mpnull;
       }
     }
     if ( mp.size() > 5 ) mol2.insert( mp );
@@ -847,17 +881,17 @@ bool ProteinTools::tidy_peptide_bond( clipper::MMonomer& mm1, clipper::MMonomer&
     if ( (ca1-ca2).lengthsq() < cmax*cmax ) {
       // check and rebuild peptide units if necessary
       if ( (cc1-cn2).lengthsq() > dmax*dmax ) {
-	clipper::Vec3<> v = clipper::Vec3<>::cross( cn2-cc1, ca2-ca1 );
-	v = clipper::Vec3<>::cross( v, ca2-ca1 ).unit();
-	cc1 = clipper::Coord_orth( 0.63*ca1 + 0.37*ca2 + 0.57*v );
-	cn2 = clipper::Coord_orth( 0.37*ca1 + 0.63*ca2 - 0.43*v );
+        clipper::Vec3<> v = clipper::Vec3<>::cross( cn2-cc1, ca2-ca1 );
+        v = clipper::Vec3<>::cross( v, ca2-ca1 ).unit();
+        cc1 = clipper::Coord_orth( 0.63*ca1 + 0.37*ca2 + 0.57*v );
+        cn2 = clipper::Coord_orth( 0.37*ca1 + 0.63*ca2 - 0.43*v );
       }
       // check and restore C-N connectivity if necessary
       if ( (cc1-cn2).lengthsq() > dmax*dmax ) {
-	double d = sqrt( ( cc1 - cn2 ).lengthsq() );
-	double f = 0.5 * ( 1.0 - dmax / d );
-	cc1 = (1.0-f)*cc1 + f*cn2;
-	cn2 = (1.0-f)*cn2 + f*cc1;
+        double d = sqrt( ( cc1 - cn2 ).lengthsq() );
+        double f = 0.5 * ( 1.0 - dmax / d );
+        cc1 = (1.0-f)*cc1 + f*cn2;
+        cn2 = (1.0-f)*cn2 + f*cc1;
       }
       // store
       mm1[c1].set_coord_orth( cc1 );

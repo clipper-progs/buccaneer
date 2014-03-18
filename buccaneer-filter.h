@@ -12,6 +12,7 @@ class Ca_filter {
   bool operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap ) const;
 
   static bool filter( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, double sigcut );
+  static bool filter( clipper::MiniMol& mol, double sigcut );
  private:
   double sigcut;
 };

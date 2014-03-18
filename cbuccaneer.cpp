@@ -27,7 +27,7 @@ extern "C" {
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.5.3", "$Date: 2011/10/15" );
+  CCP4Program prog( "cbuccaneer", "1.6.0", "$Date: 2014/02/25" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2010 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -80,11 +80,18 @@ int main( int argc, char** argv )
   bool doanis = false;
   bool optemp = false;
   bool fixpos = false;
+  bool correl = false;
+  bool nocorrel = false;
   double main_tgt_rad = 4.0;
   double side_tgt_rad = 5.5;
   double seq_rel = 0.95;
   double moffset = 0.0;
-  bool correl = false;
+  double model_filter_sig = 3.0;
+  double mr_filter_sig = 3.0;
+  bool model_filter = false;
+  bool mr_model = false;
+  bool mr_model_filter = false;
+  bool mr_model_seed = false;
   Ca_prep::Rama_flt rama_flt = Ca_prep::rama_flt_all;
   std::vector<std::pair<clipper::String,double> > known_ids;
   int verbose = 0;
@@ -176,14 +183,14 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) modelindex = clipper::String(args[arg]).i();
     } else if ( key == "-ramachandran-filter" ) {
       if ( ++arg < args.size() ) {
-	if ( args[arg] == "all"      ) rama_flt = Ca_prep::rama_flt_all;
-	if ( args[arg] == "helix"    ) rama_flt = Ca_prep::rama_flt_helix;
-	if ( args[arg] == "strand"   ) rama_flt = Ca_prep::rama_flt_strand;
-	if ( args[arg] == "nonhelix" ) rama_flt = Ca_prep::rama_flt_nonhelix;
+        if ( args[arg] == "all"      ) rama_flt = Ca_prep::rama_flt_all;
+        if ( args[arg] == "helix"    ) rama_flt = Ca_prep::rama_flt_helix;
+        if ( args[arg] == "strand"   ) rama_flt = Ca_prep::rama_flt_strand;
+        if ( args[arg] == "nonhelix" ) rama_flt = Ca_prep::rama_flt_nonhelix;
       }
     } else if ( key == "-known-structure" ) {
       if ( ++arg < args.size() )
-	known_ids.push_back( KnownStructure::parse(args[arg] ) );
+        known_ids.push_back( KnownStructure::parse(args[arg] ) );
     } else if ( key == "-main-chain-likelihood-radius" ) {
       if ( ++arg < args.size() ) main_tgt_rad = clipper::String(args[arg]).f();
     } else if ( key == "-side-chain-likelihood-radius" ) {
@@ -198,6 +205,20 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) moffset = clipper::String(args[arg]).f();
     } else if ( key == "-correlation-mode" ) {
       correl = true;
+    } else if ( key == "-no-correlation-mode" ) {
+      nocorrel = true;
+    } else if ( key == "-model-filter" ) {
+      model_filter = true;
+    } else if ( key == "-mr-model" ) {
+      mr_model = true;
+    } else if ( key == "-mr-model-filter" ) {
+      mr_model_filter = mr_model = true;
+    } else if ( key == "-mr-model-seed" ) {
+      mr_model_seed = mr_model = true;
+    } else if ( key == "-model-filter-sigma" ) {
+      if (++arg<args.size()) model_filter_sig = clipper::String(args[arg]).f();
+    } else if ( key == "-mr-model-filter-sigma" ) {
+      if (++arg<args.size()) mr_filter_sig = clipper::String(args[arg]).f();
     } else if ( key == "-jobs" || key == "-j" ) {
       if ( ++arg < args.size() ) ncpu = clipper::String(args[arg]).i();
     } else if ( key == "-verbose" ) {
@@ -208,7 +229,7 @@ int main( int argc, char** argv )
     }
   }
   if ( args.size() <= 1 ) {
-    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-xmlout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-known-structure <atomid[,radius]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input model is extended.\n";
+    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-xmlout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-known-structure <atomid[,radius]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-no-correlation-mode\n\t-mr-model\n\t-mr-model-seed\n\t-mr-model-filter\n\t-mr-model-filter-sigma <sigma>\n\t-model-filter\n\t-model-filter-sigma <sigma>\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input model is extended.\n";
     exit(1);
   }
 
@@ -240,10 +261,13 @@ int main( int argc, char** argv )
   Ca_find::TYPE findtype = fast ? Ca_find::SECSTRUC : Ca_find::LIKELIHOOD;
   if ( !(find||grow||join||link||seqnc||corct||filtr||ncsbd||prune||build) )
     find=grow=join=link=seqnc=corct=filtr=ncsbd=prune=build=true;
+  if ( !( correl || nocorrel ) )
+    correl = ( ippdb_wrk != "NONE" || ippdb_mr != "NONE" );
   if ( ipmtz_ref == "NONE" || ippdb_ref == "NONE" )
     BuccaneerUtil::set_reference( ipmtz_ref, ippdb_ref );
   BuccaneerLog log( title );
-  std::cout << std::endl;
+  // messages
+  std::cout << std::endl << ((correl)?std::string("Correlation mode selected"):std::string("Correlation mode not selected")) << std::endl << std::endl;
 
   // Get resolution for calculation
   mtzfile.open_read( ipmtz_ref );
@@ -253,7 +277,7 @@ int main( int argc, char** argv )
   double res_wrk = std::max( mtzfile.resolution().limit(), res_in );
   mtzfile.close_read();
   resol = clipper::Resolution( std::max( res_ref, res_wrk ) );
-  if ( res_ref > res_wrk ) std::cout << "\nWARNING: resolution of work structure truncated to reference:\n Ref: " << res_ref << " Wrk: " << res_wrk << std::endl;
+  if ( res_ref > res_wrk ) std::cout << std::endl << "WARNING: resolution of work structure truncated to reference:\n Ref: " << res_ref << " Wrk: " << res_wrk << std::endl;
 
   // Get reference reflection data
   clipper::HKL_info hkls_ref;
@@ -297,9 +321,9 @@ int main( int argc, char** argv )
     if ( ipcol_wrk_fc != "NONE" ) wrk_fp.compute( wrk_fp, compute_aniso );    
     // output
     std::cout << std::endl << "Applying anisotropy correction:"
-	      << std::endl << uaniso.format() << std::endl << std::endl;
+              << std::endl << uaniso.format() << std::endl << std::endl;
   }
-
+  
   // apply free flag
   clipper::HKL_data<F_sigF> wrk_fwrk = wrk_f;
   //wrk_fwrk.mask( flag != freerindex );
@@ -369,7 +393,7 @@ int main( int argc, char** argv )
 
     // prepare llk targets
     Ca_prep caprep( main_tgt_rad, side_tgt_rad, rama_flt, correl, seqnc,
-		    verbose>3 );
+                    verbose>3 );
     caprep( llktgt, llkcls, mol_ref, xref );
 
     log.log( "PREP" );
@@ -418,10 +442,22 @@ int main( int argc, char** argv )
     // merge multi-model results
     if ( merge ) {
       Ca_merge camerge( seq_rel );
+      std::cout << " C-alphas before model merge:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
       camerge( mol_wrk, xwrk, llkcls, seq_wrk );
       std::cout << " C-alphas after model merge:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
       log.log( "MRG ", mol_wrk, verbose>9 );
     }
+
+    // Filter input model
+    if ( model_filter ) {
+      std::cout << " C-alphas before model filter:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+      Ca_filter::filter( mol_wrk, model_filter_sig );
+      std::cout << " C-alphas after model filter:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+      log.log( "FLT ", mol_wrk, verbose>9 );
+    }
+
+    // Augment input model with MR model
+    if ( mr_model ) Ca_merge::merge_mr( mol_wrk, mol_mr, mr_filter_sig, 3, mr_model_filter, mr_model_seed );
 
     // model building loop
     for ( int cyc = 0; cyc < ncyc; cyc++ ) {
@@ -430,82 +466,82 @@ int main( int argc, char** argv )
 
       // find C-alphas by slow likelihood search
       if ( find ) {
-	cafind( mol_wrk, xwrk, llktgt, findtype, modelindex );
-	std::cout << " C-alphas after finding:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
-	log.log( "FIND", mol_wrk, verbose>9 );
+        cafind( mol_wrk, xwrk, llktgt, findtype, modelindex );
+        std::cout << " C-alphas after finding:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+        log.log( "FIND", mol_wrk, verbose>9 );
       }
 
       // grow C-alphas
       if ( grow ) {
-	Ca_grow cagrow( 25 );
-	cagrow( mol_wrk, xwrk, llktgt );
-	std::cout << " C-alphas after growing:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
-	log.log( "GROW", mol_wrk, verbose>9 );
+        Ca_grow cagrow( 25 );
+        cagrow( mol_wrk, xwrk, llktgt );
+        std::cout << " C-alphas after growing:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+        log.log( "GROW", mol_wrk, verbose>9 );
       }
     
       // join C-alphas
       if ( join ) {
-	Ca_join cajoin( 2.0 );
-	cajoin( mol_wrk );
-	std::cout << " C-alphas after joining:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
-	log.log( "JOIN", mol_wrk, verbose>9 );
+        Ca_join cajoin( 2.0 );
+        cajoin( mol_wrk );
+        std::cout << " C-alphas after joining:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+        log.log( "JOIN", mol_wrk, verbose>9 );
       }
 
       // link C-alphas
       if ( link ) {
-	Ca_link calnk( 10.0, 24 );
-	calnk( mol_wrk, xwrk, llktgt );
-	std::cout << " C-alphas linked:           " << calnk.num_linked() << std::endl;
-	log.log( "LINK", mol_wrk, verbose>9 );
+        Ca_link calnk( 10.0, 24 );
+        calnk( mol_wrk, xwrk, llktgt );
+        std::cout << " C-alphas linked:           " << calnk.num_linked() << std::endl;
+        log.log( "LINK", mol_wrk, verbose>9 );
       }
     
       // assign sequences
       if ( seqnc ) {
-	Ca_sequence caseq( seq_rel );
-	caseq( mol_wrk, xwrk, llkcls, seq_wrk );
-	std::cout << " C-alphas sequenced:        " << caseq.num_sequenced() << std::endl;
-	history = caseq.format();
-	log.log( "SEQU", mol_wrk, verbose>9 );
+        Ca_sequence caseq( seq_rel );
+        caseq( mol_wrk, xwrk, llkcls, seq_wrk );
+        std::cout << " C-alphas sequenced:        " << caseq.num_sequenced() << std::endl;
+        history = caseq.format();
+        log.log( "SEQU", mol_wrk, verbose>9 );
       }
 
       // correct insertions/deletions
       if ( corct ) {
-	Ca_correct cacor( 12 );
-	cacor( mol_wrk, xwrk, llkcls, seq_wrk );
-	std::cout << " C-alphas corrected:        " << cacor.num_corrected() << std::endl;
-	log.log( "CORR", mol_wrk, verbose>9 );
+        Ca_correct cacor( 12 );
+        cacor( mol_wrk, xwrk, llkcls, seq_wrk );
+        std::cout << " C-alphas corrected:        " << cacor.num_corrected() << std::endl;
+        log.log( "CORR", mol_wrk, verbose>9 );
       }
 
       // filter poor density
       if ( filtr ) {
-	Ca_filter cafiltr( 1.0 );
-	cafiltr( mol_wrk, xwrk );
-	std::cout << " C-alphas after filtering:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
-	log.log( "FILT", mol_wrk, verbose>9 );
+        Ca_filter cafiltr( 1.0 );
+        cafiltr( mol_wrk, xwrk );
+        std::cout << " C-alphas after filtering:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+        log.log( "FILT", mol_wrk, verbose>9 );
       }
 
       // ncsbuild C-alphas
       if ( ncsbd ) {
-	Ca_ncsbuild cancsbuild( seq_rel, 1.0, 12 );
-	cancsbuild( mol_wrk, xwrk, llkcls, seq_wrk );
-	std::cout << " C-alphas after NCS build:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
-	log.log( "NCSB", mol_wrk, verbose>9 );
+        Ca_ncsbuild cancsbuild( seq_rel, 1.0, 12 );
+        cancsbuild( mol_wrk, xwrk, llkcls, seq_wrk );
+        std::cout << " C-alphas after NCS build:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+        log.log( "NCSB", mol_wrk, verbose>9 );
       }
 
       // prune C-alphas for clashes with other chains and known model
       if ( prune ) {
-	Ca_prune caprune( 3.0 );
-	caprune( mol_wrk );
-	std::cout << " C-alphas after pruning:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
-	log.log( "PRUN", mol_wrk, verbose>9 );
+        Ca_prune caprune( 3.0 );
+        caprune( mol_wrk );
+        std::cout << " C-alphas after pruning:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+        log.log( "PRUN", mol_wrk, verbose>9 );
       }
 
       // build side chains/atoms
       if ( build ) {
-	Ca_build cabuild( newrestype );
-	cabuild( mol_wrk, xwrk );
-	std::cout << " C-alphas after rebuilding: " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
-	log.log( "REBU", mol_wrk, verbose>9 );
+        Ca_build cabuild( newrestype );
+        cabuild( mol_wrk, xwrk );
+        std::cout << " C-alphas after rebuilding: " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
+        log.log( "REBU", mol_wrk, verbose>9 );
       }
 
       // tidy output model
@@ -520,16 +556,16 @@ int main( int argc, char** argv )
       msg = log.log( mol_wrk, mol_mr, seq_wrk );
       prog.summary_beg();
       std::cout << "Internal cycle " << clipper::String( cyc+1, 3 )
-		<< std::endl << msg << std::endl;
+                << std::endl << msg << std::endl;
       prog.summary_end();
 
       // file output
       if ( opxml != "NONE" ) log.xml( opxml );
       if ( optemp ) {
-	clipper::String c( cyc, 1 );
-	clipper::MMDBfile mmdb;
-	mmdb.export_minimol( mol_wrk );
-	mmdb.write_file( oppdb.substr(0,oppdb.rfind(".")+1) + c + ".pdb" );
+        clipper::String c( cyc, 1 );
+        clipper::MMDBfile mmdb;
+        mmdb.export_minimol( mol_wrk );
+        mmdb.write_file( oppdb.substr(0,oppdb.rfind(".")+1) + c + ".pdb" );
       }
     } // next cycle
 
@@ -540,12 +576,12 @@ int main( int argc, char** argv )
     // adjust residue names
     if ( newresname != "NONE" )
       for ( int c = 0; c < mol_wrk.size(); c++ )
-	for ( int r = 0; r < mol_wrk[c].size(); r++ )
-	  if ( ProteinTools::residue_index_3( mol_wrk[c][r].type() ) < 0 )
-	    mol_wrk[c][r].set_type( newresname );
+        for ( int r = 0; r < mol_wrk[c].size(); r++ )
+          if ( ProteinTools::residue_index_3( mol_wrk[c][r].type() ) < 0 )
+            mol_wrk[c][r].set_type( newresname );
 
     // model tidy
-    ModelTidy mtidy;
+    ModelTidy mtidy( 1.0, 12, verbose > 6 );
     bool tidy = mtidy.tidy( mol_wrk, mol_mr, seq_wrk );
     if ( !tidy ) std::cout << "ModelTidy error" << std::endl; // can't happen
     // add known structure from input model

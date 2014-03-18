@@ -6,10 +6,6 @@
 
 #include <algorithm>
 
-#ifdef scr1 // defined on Windows
-# undef scr1
-# undef scr2
-#endif
 
 bool ModelTidy::tidy( clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, const clipper::MMoleculeSequence& seq ) const
 {
@@ -17,15 +13,6 @@ bool ModelTidy::tidy( clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, con
   std::vector<int> chnnums = chain_assign( mol, mol_mr, seqnums, rmsd_, nmin_ );
   chain_move( mol, mol_mr, chnnums );
   return update_model( mol, mol_mr, chnnums );
-}
-
-
-std::vector<int> ModelTidy::chain_assign( const clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, const std::vector<int> seqnums, const double rmsd, const int nmin )
-{
-  if ( mol_mr.size() > 0 )
-    return assign_chains( mol, mol_mr );
-  else
-    return assign_chains( mol, seqnums, rmsd, nmin );
 }
 
 
@@ -52,12 +39,12 @@ bool ModelTidy::chain_move( clipper::MiniMol& mol, const clipper::MiniMol& mol_m
     for ( int s = 0; s < nsrc; s++ ) {
       clipper::MPolymer mptmp;
       for ( int c = 0; c < nchn; c++ )
-	if ( chnnums[c] == s ) {
-	  if ( mptmp.size() > 0 )
-	    move_chain( mol[c], mptmp, spgr, cell );
-	  for ( int r = 0; r < mol[c].size(); r++ )
-	    mptmp.insert( mol[c][r] );
-	}
+        if ( chnnums[c] == s ) {
+          if ( mptmp.size() > 0 )
+            move_chain( mol[c], mptmp, spgr, cell );
+          for ( int r = 0; r < mol[c].size(); r++ )
+            mptmp.insert( mol[c][r] );
+        }
     }
 
   }
@@ -65,35 +52,7 @@ bool ModelTidy::chain_move( clipper::MiniMol& mol, const clipper::MiniMol& mol_m
 }
 
 
-std::vector<int> ModelTidy::assign_chains( const clipper::MiniMol& mol, const clipper::MiniMol& mol_mr )
-{
-  const int nchn = mol.size();
-  const int nsrc = mol_mr.size();
-
-  if ( nchn == 0 ) return std::vector<int>();
-
-  // set up chain numbers
-  const double rad = 5.0;
-  clipper::MAtomNonBond nb( mol_mr, rad );
-  std::vector<int> srcnums( nsrc );
-  for ( int c2 = 0; c2 < nsrc; c2++ ) srcnums[c2] = c2;
-
-  // count references
-  std::vector<int> chnnums( nchn, -1 );
-  for ( int c1 = 0; c1 < nchn; c1++ ) {
-    std::vector<int> refcount =
-      count_contacts( nb, mol_mr, srcnums, mol[c1], rad );
-    int c = 0;
-    for ( int c2 = 0; c2 < nsrc; c2++ )
-      if ( refcount[c2] > refcount[c] ) c = c2;
-    if ( refcount[c] > 5 ) chnnums[c1] = c;
-  }
-
-  return chnnums;
-}
-
-
-std::vector<int> ModelTidy::assign_chains( const clipper::MiniMol& mol, const std::vector<int> seqnums, const double rmsd, const int nmin )
+std::vector<int> ModelTidy::chain_assign( const clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, const std::vector<int> seqnums, const double rmsd, const int nmin )
 {
   const int nchn = mol.size();
 
@@ -102,15 +61,32 @@ std::vector<int> ModelTidy::assign_chains( const clipper::MiniMol& mol, const st
   const clipper::Array2d<int> seqflg = sequence_flags( mol );
   const int lseq = seqflg.cols();
 
+  // assign fragments to mr chains
+  std::vector<int> mrnums( nchn, -1 );
+  if ( mol_mr.size() > 0 ) {
+    std::vector<int> chnmr( mol_mr.size() );
+    for ( int c = 0; c < chnmr.size(); c++ ) chnmr[c] = c;
+    const double rad = 3.0;
+    clipper::MAtomNonBond nb( mol_mr, rad );
+    for ( int c = 0; c < nchn; c++ ) {
+      std::vector<int> refcount = count_contacts( nb, mol_mr, chnmr, mol[c], rad );
+      int tot(0), imax(0);
+      for ( int i = 0; i < refcount.size(); i++ ) tot += refcount[i];
+      for ( int i = 0; i < refcount.size(); i++ ) if ( refcount[i] > refcount[imax] ) imax = i;
+      if ( refcount[imax] > 5*(tot+1)/10 ) mrnums[c] = imax;
+    }
+    //for (int c=0;c<nchn;c++) if (mrnums[c]>=0) std::cout << " Fragment " << c << " assigned to chain " << mrnums[c] << std::endl;
+  }
+
   // build matrix of which chains superpose
   clipper::Array2d<int> super( nchn, nchn, false );
   for ( int c1 = 0; c1 < nchn-1; c1++ )
     for ( int c2 = c1 + 1; c2 < nchn; c2++ )
       if ( seqnums[c1] >= 0 && seqnums[c2] >= 0 &&
-	   seqnums[c1] == seqnums[c2] ) {
-	const clipper::RTop_orth rtop =
-	  ProteinTools::superpose( mol[c2], mol[c1], rmsd, nmin, nmin );
-	if ( ! rtop.is_null() ) super(c1,c2) = super(c2,c1) = true;
+           seqnums[c1] == seqnums[c2] ) {
+        const clipper::RTop_orth rtop =
+          ProteinTools::superpose( mol[c2], mol[c1], rmsd, nmin, nmin );
+        if ( ! rtop.is_null() ) super(c1,c2) = super(c2,c1) = true;
       }
 
   /*
@@ -152,59 +128,64 @@ std::vector<int> ModelTidy::assign_chains( const clipper::MiniMol& mol, const st
 
   // now expand chain numbers list
   for ( int cyc = 0; cyc < nchn; cyc++ ) {
-    std::vector<double> scr1(nchn,0.0), scr2(nchn,0.0), scr(nchn,0.0);
+    std::vector<double> score1(nchn,0.0), score2(nchn,0.0), score(nchn,0.0);
     std::vector<int> chn(nchn,-1);
 
     // search over chains to find the best one to merge
     for ( int c = 0; c < nchn; c++ ) 
       if ( chnnums[c] < 0 && seqnums[c] >= 0 && num_seq[c] > 0 ) {
-	std::vector<double> sscr1(nsrc,0.0), sscr2(nsrc,0.0), sscr(nsrc,0.0);
+        std::vector<double> sscore1(nsrc,0.0), sscore2(nsrc,0.0), sscore(nsrc,0.0);
 
-	// score by intimacy to known chains
-	std::vector<int> refcount =
-	  count_contacts( nb, mol, chnnums, mol[c], rad );
-	for ( int s = 0; s < nsrc; s++ )
-	  sscr1[s] = double(refcount[s]) / double(num_seq[c]);
+        // score by intimacy to known chains
+        std::vector<int> refcount =
+          count_contacts( nb, mol, chnnums, mol[c], rad );
+        for ( int s = 0; s < nsrc; s++ )
+          sscore1[s] = double(refcount[s]) / double(num_seq[c]);
 
-	// score by overlap with known chains
-	std::vector<int> clscount( nsrc, 0 );
-	for ( int c1 = 0; c1 < nchn; c1++ )
-	  if ( chnnums[c1] >= 0 )
-	    for ( int r = 0; r < lseq; r++ )
-	      if ( seqflg(c,r) && seqflg(c1,r) ) clscount[chnnums[c1]]++;
-	for ( int s = 0; s < nsrc; s++ )
-	  sscr2[s] = double(clscount[s]) / double(num_seq[c]);
+        // score by overlap with known chains
+        std::vector<int> clscount( nsrc, 0 );
+        for ( int c1 = 0; c1 < nchn; c1++ )
+          if ( chnnums[c1] >= 0 )
+            for ( int r = 0; r < lseq; r++ )
+              if ( seqflg(c,r) && seqflg(c1,r) ) clscount[chnnums[c1]]++;
+        for ( int s = 0; s < nsrc; s++ )
+          sscore2[s] = double(clscount[s]) / double(num_seq[c]);
 
-	// filter out sources with clashing chain ids
-	std::vector<int> sameseq( nsrc, true );
-	for ( int c1 = 0; c1 < nchn; c1++ )
-	  if ( chnnums[c1] >= 0 && seqnums[c1] != seqnums[c] )
-	    sameseq[chnnums[c1]] = false;
+        // filter out sources with clashing chain ids
+        std::vector<int> sameseq( nsrc, true );
+        for ( int c1 = 0; c1 < nchn; c1++ )
+          if ( chnnums[c1] >= 0 && seqnums[c1] != seqnums[c] )
+            sameseq[chnnums[c1]] = false;
 
-	// total score
-	for ( int s = 0; s < nsrc; s++ )
-	  if ( sameseq[s] )
-	    sscr[s] = sscr1[s] - 2.0*sscr2[s];
+        // filter out sources with clashing mr chain ids
+        for ( int c1 = 0; c1 < nchn; c1++ )
+          if ( chnnums[c1] >= 0 && mrnums[c] >= 0 && mrnums[c1] >= 0 && mrnums[c1] != mrnums[c] )
+            sameseq[chnnums[c1]] = false;
 
-	// get best score for this chain
-	int schn = 0;
-	for ( int s = 0; s < nsrc; s++ )
-	  if ( sscr[s] > sscr[schn] ) schn = s;
-	chn[c] = schn;
-	scr[c] = sscr[schn];
-	scr1[c] = sscr1[schn];
-	scr2[c] = sscr2[schn];
+        // total score
+        for ( int s = 0; s < nsrc; s++ )
+          if ( sameseq[s] )
+            sscore[s] = sscore1[s] - 2.0*sscore2[s];
+
+        // get best score for this chain
+        int schn = 0;
+        for ( int s = 0; s < nsrc; s++ )
+          if ( sscore[s] > sscore[schn] ) schn = s;
+        chn[c] = schn;
+        score[c] = sscore[schn];
+        score1[c] = sscore1[schn];
+        score2[c] = sscore2[schn];
       }
 
     //std::cout << "CNN: "; for ( int c = 0; c < nchn; c++ ) std::cout << clipper::String( chnnums[c], 5 ) << ","; std::cout << std::endl;
     //std::cout << "CHN: "; for ( int c = 0; c < nchn; c++ ) std::cout << clipper::String( chn[c], 5 ) << ","; std::cout << std::endl;
-    //std::cout << "SC1: "; for ( int c = 0; c < nchn; c++ ) std::cout << clipper::String( scr1[c], 5 ) << ","; std::cout << std::endl;
-    //std::cout << "SC2: "; for ( int c = 0; c < nchn; c++ ) std::cout << clipper::String( scr2[c], 5 ) << ","; std::cout << std::endl << std::endl;
+    //std::cout << "SC1: "; for ( int c = 0; c < nchn; c++ ) std::cout << clipper::String( score1[c], 5 ) << ","; std::cout << std::endl;
+    //std::cout << "SC2: "; for ( int c = 0; c < nchn; c++ ) std::cout << clipper::String( score2[c], 5 ) << ","; std::cout << std::endl << std::endl;
     // find best chain to assign
     int c = 0;
-    for ( int c1 = 0; c1 < nchn; c1++ ) if ( scr[c1] > scr[c] ) c = c1;
+    for ( int c1 = 0; c1 < nchn; c1++ ) if ( score[c1] > score[c] ) c = c1;
 
-    if ( scr[c] <= 0.0 ) break;
+    if ( score[c] <= 0.0 ) break;
 
     // add new chain to source
     chnnums[c] = chn[c];
@@ -235,7 +216,7 @@ int ModelTidy::chain_renumber( clipper::MPolymer& mp, const clipper::MMoleculeSe
   for ( int chn = 0; chn < seq.size(); chn++ ) {
     clipper::String s = "";
     for ( int res = 0; res < seq[chn].sequence().length(); res++ )
-      s += ProteinTools::residue_code_1(ProteinTools::residue_index_1(seq[chn].sequence().substr(res,1)));
+      s += ProteinTools::residue_code_1(ProteinTools::residue_index(seq[chn].sequence()[res]));
     seqs[chn] = s;
   }
   
@@ -243,7 +224,7 @@ int ModelTidy::chain_renumber( clipper::MPolymer& mp, const clipper::MMoleculeSe
   int bestchn = -1;
   int bestscr = 0;
   clipper::MSequenceAlign align( clipper::MSequenceAlign::LOCAL,
-  				 1.0, -1000.0, -4.0 );
+                                   1.0, -1000.0, -4.0 );
   std::pair<std::vector<int>,std::vector<int> > result;
   for ( int chn = 0; chn < seqs.size(); chn++ ) {
     const clipper::String& seqseq = seqs[chn];
@@ -251,10 +232,10 @@ int ModelTidy::chain_renumber( clipper::MPolymer& mp, const clipper::MMoleculeSe
     int scr = 0;
     for ( int i = 0; i < result.first.size(); i++ ) {
       if ( result.first[i] >= 0 ) {
-	if ( chnseq[i] == seqseq[result.first[i]] )
- 	  scr++;
-  	else
-  	  scr--;
+        if ( chnseq[i] == seqseq[result.first[i]] )
+          scr++;
+        else
+          scr--;
       }
     }
     if ( scr > bestscr ) {
@@ -268,7 +249,12 @@ int ModelTidy::chain_renumber( clipper::MPolymer& mp, const clipper::MMoleculeSe
   clipper::String truseq = seqs[bestchn];
   result = align( chnseq, truseq );
   std::vector<int> nums = result.first;
-  
+  // unnumber UNKs
+  const int flag = -999999;
+  for ( int i = 0; i < nums.size(); i++ )
+    if ( nums[i] < 0 || ProteinTools::residue_index(chnseq[i]) < 0 )
+      nums[i] = flag;
+
   /*
   std::cout << bestchn << " " << bestscr << std::endl;
   for ( int i = 0; i < chnseq.size(); i++ )
@@ -279,39 +265,13 @@ int ModelTidy::chain_renumber( clipper::MPolymer& mp, const clipper::MMoleculeSe
   std::cout << std::endl;
   */
   
-  // find bounds of sequenced region
-  int i0, i1, i;
-  for ( i0 = 0;    i0 < nums.size(); i0++ ) if ( nums[i0] >= 0 ) break;
-  for ( i1 = nums.size()-1; i1 >= 0; i1-- ) if ( nums[i1] >= 0 ) break;
-  if ( i0 < nums.size() )
-    for ( i = i0 - 1; i >= 0;          i-- ) nums[i] = nums[i+1] - 1;
-  if ( i1 >= 0 )
-    for ( i = i1 + 1; i < nums.size(); i++ ) nums[i] = nums[i-1] + 1;
-  
-  // renumber the model, with inscodes if necessary
-  const clipper::String inscodes = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const int l = inscodes.length();
-  for ( i = 0; i < nums.size(); i++ ) nums[i] = nums[i] * l;
-  for ( i = 1; i < nums.size(); i++ )
-    if ( nums[i] <= nums[i-1] ) nums[i] = nums[i-1]+1;
-  for ( i = 0; i < mp.size(); i++ ) {
-    const int nres = (nums[i]/l) + 1;
-    const int nins = clipper::Util::mod( nums[i], l );
-    if ( nins == 0 ) mp[i].set_seqnum( nres );
-    else             mp[i].set_seqnum( nres, inscodes.substr( nins, 1 ) );
+  // fill numbers foreward and back
+  for ( int i = nums.size()-1; i > 0; i-- ) if ( nums[i-1] == flag && nums[i] > flag ) nums[i-1] = nums[i]-1;
+  for ( int i = 0; i < nums.size()-1; i++ ) if ( nums[i+1] == flag && nums[i] > flag ) nums[i+1] = nums[i]+1;
+  for ( int i = 0; i < nums.size(); i++ ) {
+    if ( nums[i] == -999999 ) nums[i] = -1;
+    mp[i].set_seqnum( nums[i]+1 );
   }
-
-  // fill in sequence if reqiured
-  for ( i = 0; i < mp.size(); i++ )
-    if ( mp[i].type() == "###" ) {
-      if ( nums[i] % l == 0 ) {
-	const int s = nums[i]/l;
-	const int t = ProteinTools::residue_index( truseq[s] );
-	mp[i].set_type( ProteinTools::residue_code_3( t ) );
-      } else {
-	mp[i].set_type( "UNK" );
-      }
-    }
 
   /*
   for ( int i = 0; i < chnseq.size()-1; i++ )
@@ -333,51 +293,24 @@ bool ModelTidy::update_model( clipper::MiniMol& mol, const clipper::MiniMol& mol
   for ( int i = 0; i < chnnums.size(); i++ )
     nsrc = std::max( nsrc, chnnums[i]+1 );
 
-  // chain ids
-  std::vector<clipper::String> chnids;
-  for ( int c = 0; c < mol_mr.size(); c++ ) chnids.push_back( mol_mr[c].id() );
-  for ( int i = chnids.size(); i < nsrc; i++ ) chnids.push_back( "" );
-
   // assemble new chains
   clipper::MiniMol molnew( spgr, cell );
   for ( int c2 = 0; c2 < nsrc; c2++ ) {
     clipper::MPolymer mp;
-    mp.set_id( chnids[c2] );
-
+    
     // sort fragments by sequence number
     std::vector<std::pair<int,int> > srcsort;
     for ( int c1 = 0; c1 < nchn; c1++ ) {
       if ( chnnums[c1] == c2 ) {
-	srcsort.push_back(std::pair<int,int>(mol[c1][0].seqnum(),c1));
+        srcsort.push_back(std::pair<int,int>(mol[c1][0].seqnum(),c1));
       }
     }
     std::sort( srcsort.begin(), srcsort.end() );
     for ( int i = 0; i < srcsort.size(); i++ ) {
       int c1 = srcsort[i].second;
       for ( int r1 = 0; r1 < mol[c1].size(); r1++ )
-	mp.insert( mol[c1][r1] );
+        mp.insert( mol[c1][r1] );
       if ( verbose_ ) std::cout << "Adding chain " << mol[c1].id() << " to chain " << c2 << " " << mp.id() << std::endl;
-    }
-
-    // record chain gaps
-    std::vector<bool> gaps( mp.size(), false );
-    for ( int i = 1; i < gaps.size(); i++ )
-      gaps[i] = ! clipper::MMonomer::protein_peptide_bond( mp[i-1], mp[i] );
-
-    // renumber the model, with inscodes if necessary
-    const clipper::String inscodes = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    const int l = inscodes.length();
-    std::vector<int> nums( mp.size() );
-    for ( int i = 0; i < nums.size(); i++ ) nums[i] = mp[i].seqnum();
-    for ( int i = 0; i < nums.size(); i++ ) nums[i] = nums[i] * l;
-    for ( int i = 1; i < nums.size(); i++ )
-      if ( gaps[i] ) nums[i] = std::max( nums[i], nums[i-1]-nums[i-1]%l+2*l );
-      else           nums[i] = std::max( nums[i], nums[i-1]+1 );
-    for ( int i = 0; i < mp.size(); i++ ) {
-      const int nres = (nums[i]/l) + 1;
-      const int nins = clipper::Util::mod( nums[i], l );
-      if ( nins == 0 ) mp[i].set_seqnum( nres );
-      else             mp[i].set_seqnum( nres, inscodes.substr( nins, 1 ) );
     }
 
     if ( mp.size() > 0 ) molnew.insert( mp );
@@ -389,8 +322,50 @@ bool ModelTidy::update_model( clipper::MiniMol& mol, const clipper::MiniMol& mol
     if ( chnnums[c] < 0 ) molunk.insert( mol[c] );
   if ( verbose_ ) std::cout << "Chains -  Old: " << nchn << "  Assigned: " << molnew.size() << "  Unassigned: " << molunk.size() << std::endl;
   // copy chains across
-  for ( int c = 0; c < molunk.size(); c++ ) molunk[c].set_id( "" );
   for ( int c = 0; c < molunk.size(); c++ ) molnew.insert( molunk[c] );
+
+  // renumber the model, with inscodes if necessary
+  const clipper::String inscodes = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const int l = inscodes.length();
+  for ( int c = 0; c < molnew.size(); c++ ) {
+    clipper::MPolymer mp = molnew[c];
+    // record chain gaps
+    std::vector<bool> gaps( mp.size(), false );
+    for ( int i = 1; i < gaps.size(); i++ )
+      gaps[i] = ! clipper::MMonomer::protein_peptide_bond( mp[i-1], mp[i] );
+    // and renumber
+    std::vector<int> nums( mp.size() );
+    for ( int i = 0; i < nums.size(); i++ ) nums[i] = mp[i].seqnum();
+    for ( int i = 0; i < nums.size(); i++ ) nums[i] = nums[i] * l;
+    for ( int i = 1; i < nums.size(); i++ )
+      if ( gaps[i] ) nums[i] = std::max( nums[i], nums[i-1]-clipper::Util::mod(nums[i-1],l)+2*l );
+      else           nums[i] = std::max( nums[i], nums[i-1]+1 );
+    for ( int i = 0; i < mp.size(); i++ ) {
+      const int nres = (nums[i]/l);
+      const int nins = clipper::Util::mod( nums[i], l );
+      if ( nins == 0 ) mp[i].set_seqnum( nres );
+      else             mp[i].set_seqnum( nres, inscodes.substr( nins, 1 ) );
+    }
+    molnew[c] = mp;
+  }
+
+  // assign chain ids
+  for ( int c = 0; c < molnew.size(); c++ ) molnew[c].set_id( "" );
+  if ( mol_mr.size() > 0 ) {
+    std::vector<int> chnmr( mol_mr.size() );
+    for ( int c = 0; c < chnmr.size(); c++ ) chnmr[c] = c;
+    const double rad = 3.0;
+    clipper::MAtomNonBond nb( mol_mr, rad );
+    std::vector<std::vector<int> > refcounts;
+    for ( int c = 0; c < molnew.size(); c++ )
+      refcounts.push_back( count_contacts( nb, mol_mr, chnmr, molnew[c], rad ) );
+    for ( int cmr = 0; cmr < mol_mr.size(); cmr++ ) {
+      int cmax = 0;
+      for ( int c = 0; c < molnew.size(); c++ )
+        if ( refcounts[c][cmr] > refcounts[cmax][cmr] ) cmax = c;
+      molnew[cmax].set_id( mol_mr[cmr].id() );
+    }
+  }
 
   mol = molnew;
   return true;
@@ -464,26 +439,26 @@ std::vector<int> ModelTidy::count_contacts( const clipper::MAtomNonBond& nb, con
     if ( ProteinTools::residue_index_3( mp[r1].type() ) >= 0 ) {
       int a1 = mp[r1].lookup( " CA ", clipper::MM::ANY );
       if ( a1 >= 0 ) {
-	// find nearby source model atoms
+        // find nearby source model atoms
         const std::vector<clipper::MAtomIndexSymmetry> atoms =
           nb( mp[r1][a1].coord_orth(), rad );
         int chnn1 = -1;
-	// loop over source model atoms
+        // loop over source model atoms
         for ( int i = 0; i < atoms.size(); i++ ) {
           const int c2 = atoms[i].polymer();
           const int r2 = atoms[i].monomer();
-	  int chnn2 = chnnums[c2];
-	  // if this atom has an index number then consider it
-	  if ( chnn2 >= 0 ) {
-	    if ( ProteinTools::residue_index_3( mol[c2][r2].type() ) >= 0 ) {
-	      if ( chnn1 < 0 ) {
-		chnn1 = chnn2;
-	      } else if ( chnn1 != chnn2 ) {
-		chnn1 = -1;
-		break;
-	      }
-	    }
-	  }
+          int chnn2 = chnnums[c2];
+          // if this atom has an index number then consider it
+          if ( chnn2 >= 0 ) {
+            if ( ProteinTools::residue_index_3( mol[c2][r2].type() ) >= 0 ) {
+              if ( chnn1 < 0 ) {
+                chnn1 = chnn2;
+              } else if ( chnn1 != chnn2 ) {
+                chnn1 = -1;
+                break;
+              }
+            }
+          }
         }
         if ( chnn1 >= 0 ) result[chnn1]++;
       }
@@ -499,7 +474,7 @@ std::vector<int> ModelTidy::sequence_count( const clipper::MiniMol& mol )
   for ( int c = 0; c < mol.size(); c++ )
     for ( int r = 0; r < mol[c].size(); r++ )
       if ( ProteinTools::residue_index_3( mol[c][r].type() ) >= 0 )
-	result[c]++;
+        result[c]++;
   return result;
 }
 
@@ -513,9 +488,9 @@ clipper::Array2d<int> ModelTidy::sequence_flags( const clipper::MiniMol& mol )
   for ( int c = 0; c < mol.size(); c++ )
     for ( int r = 0; r < mol[c].size(); r++ )
       if ( ProteinTools::residue_index_3( mol[c][r].type() ) >= 0 ) {
-	int s = mol[c][r].seqnum();
-	smin = std::min( smin, s );
-	smax = std::max( smax, s );
+        int s = mol[c][r].seqnum();
+        smin = std::min( smin, s );
+        smax = std::max( smax, s );
       }
   int nseq = smax - smin + 1;
   if ( nseq <= 0 ) return clipper::Array2d<int>( 0, 0 );
@@ -525,8 +500,8 @@ clipper::Array2d<int> ModelTidy::sequence_flags( const clipper::MiniMol& mol )
   for ( int c = 0; c < mol.size(); c++ )
     for ( int r = 0; r < mol[c].size(); r++ )
       if ( ProteinTools::residue_index_3( mol[c][r].type() ) >= 0 ) {
-	int s = mol[c][r].seqnum();
-	seqflg(c,s-smin) = true;
+        int s = mol[c][r].seqnum();
+        seqflg(c,s-smin) = true;
       }
 
   return seqflg;

@@ -22,8 +22,6 @@ class ModelTidy {
   static clipper::Array2d<int> sequence_flags( const clipper::MiniMol& mol );
 
  private:
-  static std::vector<int> assign_chains( const clipper::MiniMol& mol, const clipper::MiniMol& mol_mr );
-  static std::vector<int> assign_chains( const clipper::MiniMol& mol, const std::vector<int> seqnums, const double rmsd, const int nmin );
   bool update_model( clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, std::vector<int> chnnums ) const;
   static int chain_renumber( clipper::MPolymer& mp, const clipper::MMoleculeSequence& seq );
   static std::vector<int> count_contacts( const clipper::MAtomNonBond& nb, const clipper::MiniMol& mol, const std::vector<int>& chnnums, const clipper::MPolymer mp, const double& rad );

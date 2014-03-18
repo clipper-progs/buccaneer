@@ -161,6 +161,7 @@ class ProteinTools {
   static bool globularise( clipper::MiniMol& mol );
   static bool symm_match( clipper::MiniMol& molwrk, const clipper::MiniMol& molref );
   static std::vector<float> main_chain_densities( const clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, int nsmooth=0 );
+  static std::vector<float> main_chain_u_values( const clipper::MPolymer& mp, int nsmooth=0 );
   static bool split_chains_at_gap( clipper::MiniMol& mol );
   static bool split_chains_at_unk( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap );
   static bool tidy_peptide_bond( clipper::MMonomer& mm1, clipper::MMonomer& mm2 );
