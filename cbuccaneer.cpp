@@ -251,7 +251,7 @@ int main( int argc, char** argv )
   clipper::CCP4MTZfile mtzfile;
   mtzfile.set_column_label_mode( clipper::CCP4MTZfile::Legacy );
   std::string msg;
-  const int mmdbflags = MMDBF_IgnoreBlankLines | MMDBF_IgnoreDuplSeqNum | MMDBF_IgnoreNonCoorPDBErrors | MMDBF_IgnoreRemarks;
+  const int mmdbflags = ::mmdb::MMDBF_IgnoreBlankLines | ::mmdb::MMDBF_IgnoreDuplSeqNum | ::mmdb::MMDBF_IgnoreNonCoorPDBErrors | ::mmdb::MMDBF_IgnoreRemarks;
   ProteinTools proteintools = ProteinTools();
   Ca_prep::set_cpus( ncpu );
   Ca_find::set_cpus( ncpu );

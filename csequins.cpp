@@ -95,7 +95,7 @@ int main( int argc, char** argv )
   using clipper::data32::F_sigF;  using clipper::data32::F_phi;
   using clipper::data32::Phi_fom; using clipper::data32::Flag;
   using clipper::data32::ABCD;
-  const int mmdbflags = MMDBF_IgnoreBlankLines | MMDBF_IgnoreDuplSeqNum | MMDBF_IgnoreNonCoorPDBErrors | MMDBF_IgnoreRemarks;
+  const int mmdbflags = ::mmdb::MMDBF_IgnoreBlankLines | ::mmdb::MMDBF_IgnoreDuplSeqNum | ::mmdb::MMDBF_IgnoreNonCoorPDBErrors | ::mmdb::MMDBF_IgnoreRemarks;
  
   // Get resolution for calculation
   mtzfile.open_read( ipmtz_ref );

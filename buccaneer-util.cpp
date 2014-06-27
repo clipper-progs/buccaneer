@@ -49,10 +49,10 @@ void BuccaneerUtil::set_reference( clipper::String& mtz, clipper::String& pdb )
 
 void BuccaneerUtil::read_model( clipper::MiniMol& mol, clipper::String file, bool verbose )
 {
-  const int mmdbflags = ( MMDBF_IgnoreBlankLines |
-			  MMDBF_IgnoreDuplSeqNum |
-			  MMDBF_IgnoreNonCoorPDBErrors |
-			  MMDBF_IgnoreRemarks );
+  const int mmdbflags = ( ::mmdb::MMDBF_IgnoreBlankLines |
+			  ::mmdb::MMDBF_IgnoreDuplSeqNum |
+			  ::mmdb::MMDBF_IgnoreNonCoorPDBErrors |
+			  ::mmdb::MMDBF_IgnoreRemarks );
   clipper::MMDBfile mmdb;
   mmdb.SetFlag( mmdbflags );
   if ( file != "NONE" ) {
