@@ -110,11 +110,14 @@ bool Ca_merge::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& x
 }
 
 
-bool Ca_merge::merge_mr( clipper::MiniMol& mol, clipper::MiniMol& mol_mr, double sigcut, int nseed, bool mr_filter, bool mr_seed )
+std::vector<int> Ca_merge::merge_mr( clipper::MiniMol& mol, clipper::MiniMol& mol_mr, double sigcut, int nseed, bool mr_filter, bool mr_seed )
 {
   clipper::MPolymer mp;
   const double rad = 3.0;
   clipper::MAtomNonBond nb( mol, rad );
+
+  // result
+  std::vector<int> nres(3,0);
 
   // go through a chain at a time
   for ( int chn = 0; chn < mol_mr.size(); chn++ ) {
@@ -164,7 +167,11 @@ bool Ca_merge::merge_mr( clipper::MiniMol& mol, clipper::MiniMol& mol_mr, double
         if ( n == 0 ) mp.insert( mp2[res] );
       }
     }
-    std::cout << chn << " " << mp1.size() << " " << mp2.size() << " " << mp.size() << std::endl;
+
+    nres[0] += mp0.size();
+    nres[1] += mp1.size();
+    nres[2] += mp2.size();
+    //std::cout << chn << " " << mp1.size() << " " << mp2.size() << " " << mp.size() << std::endl;
   }
 
   // convert residues to UNK
@@ -178,5 +185,6 @@ bool Ca_merge::merge_mr( clipper::MiniMol& mol, clipper::MiniMol& mol_mr, double
     mol.insert( mp );
     ProteinTools::split_chains_at_gap( mol );
   }
-  return true;
+
+  return nres;
 }

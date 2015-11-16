@@ -27,7 +27,7 @@ extern "C" {
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.6.0", "$Date: 2014/02/25" );
+  CCP4Program prog( "cbuccaneer", "1.6.1", "$Date: 2014/11/28" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2010 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -82,6 +82,7 @@ int main( int argc, char** argv )
   bool fixpos = false;
   bool correl = false;
   bool nocorrel = false;
+  double nprad = -1.0;
   double main_tgt_rad = 4.0;
   double side_tgt_rad = 5.5;
   double seq_rel = 0.95;
@@ -191,6 +192,8 @@ int main( int argc, char** argv )
     } else if ( key == "-known-structure" ) {
       if ( ++arg < args.size() )
         known_ids.push_back( KnownStructure::parse(args[arg] ) );
+    } else if ( key == "-nonprotein-radius" ) {
+      if ( ++arg < args.size() ) nprad = clipper::String(args[arg]).f();
     } else if ( key == "-main-chain-likelihood-radius" ) {
       if ( ++arg < args.size() ) main_tgt_rad = clipper::String(args[arg]).f();
     } else if ( key == "-side-chain-likelihood-radius" ) {
@@ -351,7 +354,7 @@ int main( int argc, char** argv )
   // store a copy of the input model
   mol_wrk_in = mol_wrk;
   // store known structure info
-  KnownStructure knownstruc( mol_wrk_in, known_ids );
+  KnownStructure knownstruc( mol_wrk_in, known_ids, nprad );
   if ( verbose >= 1 ) knownstruc.debug();
 
   // Get work sequence (optional)
@@ -457,7 +460,10 @@ int main( int argc, char** argv )
     }
 
     // Augment input model with MR model
-    if ( mr_model ) Ca_merge::merge_mr( mol_wrk, mol_mr, mr_filter_sig, 3, mr_model_filter, mr_model_seed );
+    if ( mr_model ) {
+      std::vector<int> result = Ca_merge::merge_mr( mol_wrk, mol_mr, mr_filter_sig, 3, mr_model_filter, mr_model_seed );
+      std::cout << " MR residues input: " << result[0] << ", after filter: " << result[1] << ", after seeding: " << result[2] << std::endl;
+    }
 
     // model building loop
     for ( int cyc = 0; cyc < ncyc; cyc++ ) {

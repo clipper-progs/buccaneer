@@ -10,7 +10,7 @@ class Ca_merge {
  public:
   Ca_merge( double reliability = 0.5 ) : reliability_(reliability) {}
   bool operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq ) const;
-  static bool merge_mr( clipper::MiniMol& mol, clipper::MiniMol& mol_mr, double sigcut, int nseed, bool mr_filter, bool mr_seed );
+  static std::vector<int> merge_mr( clipper::MiniMol& mol, clipper::MiniMol& mol_mr, double sigcut, int nseed, bool mr_filter, bool mr_seed );
  private:
   double reliability_;
 };

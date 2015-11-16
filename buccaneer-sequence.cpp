@@ -2,6 +2,7 @@
 /* (C) 2006-2008 Kevin Cowtan & University of York all rights reserved */
 
 #include "buccaneer-sequence.h"
+#include "buccaneer-tidy.h"
 
 #include <clipper/clipper-contrib.h>
 
@@ -119,25 +120,25 @@ std::vector<bool> Ca_sequence::sequence_combine( const Score_list<clipper::Strin
       // now check whether this sequence meets the score criterion
       double r = 0.0;
       for ( int j = i+1; j < seq.size(); j++ )
-	if ( sequence_overlap( seq[i], seq[j] ) > 0.20 ) {
+        if ( sequence_overlap( seq[i], seq[j] ) > 0.20 ) {
           r = phi_approx( seq.score(i) - seq.score(j) );
           break;
         }
       // if score difference good then add matched region to sequence
       if ( r < 1.0-reliability ) {
         result[i] = true;
-	clipper::String addseq = seq[i];
-	newseq = "";
-	for ( int k = 0; k < len; k++ )
-	  newseq += ( totseq[k] == '?' ) ? addseq[k] : totseq[k];
-	totseq = newseq;
+        clipper::String addseq = seq[i];
+        newseq = "";
+        for ( int k = 0; k < len; k++ )
+          newseq += ( totseq[k] == '?' ) ? addseq[k] : totseq[k];
+        totseq = newseq;
       }
       // mask the corresponding region
       int k1 = seq[i].find_first_not_of( "?" ) - 3;
       int k2 = seq[i].find_last_not_of( "?" ) + 3;
       newseq = "";
       for ( int k = 0; k < len; k++ )
-	if ( k >= k1 && k <= k2 && totseq[k] == '?' ) newseq += 'x';
+        if ( k >= k1 && k <= k2 && totseq[k] == '?' ) newseq += 'x';
         else                                          newseq += totseq[k];
       totseq = newseq;
     }
@@ -221,17 +222,17 @@ std::vector<clipper::String> Ca_sequence::sequence_align( const std::vector<std:
       double s1 = c(i-1,j-2) + s(i,j) + 3.0;
       double s2 = c(i-3,j-2) + s(i,j) + 3.0;
       if ( s0 <= s1 && s0 <= s2 ) {  // sequence follows on
-	c(i,j) = s0;
-	b(i,j) = 0;
-	e(i-1,j-1) = 1;
+        c(i,j) = s0;
+        b(i,j) = 0;
+        e(i-1,j-1) = 1;
       } else if ( s1 <= s2 ) {       // skip a residue in chain
-	c(i,j) = s1;
-	b(i,j) = 1;
-	e(i-1,j-2) = 1;
+        c(i,j) = s1;
+        b(i,j) = 1;
+        e(i-1,j-2) = 1;
       } else {                       // skip a residue in sequence
-	c(i,j) = s2;
-	b(i,j) = 2;
-	e(i-3,j-2) = 1;
+        c(i,j) = s2;
+        b(i,j) = 2;
+        e(i-3,j-2) = 1;
       }
     }
 
@@ -239,26 +240,26 @@ std::vector<clipper::String> Ca_sequence::sequence_align( const std::vector<std:
   for ( int i = 3; i < m; i++ )
     for ( int j = 2; j < n; j++ )
       if ( e(i,j) == 0 ) {  // if this is a sequence end
-	std::vector<char> seqv(n,'?');
-	int i1 = i;
-	int j1 = j;
-	while ( i1 >= 0 && j1 >= 0 ) {
-	  seqv[j1] = seq[i1];
-	  if ( b(i1,j1) == 1 ) {
-	    seqv[j1-1] = '+';
-	    i1 = i1 - 1;
-	    j1 = j1 - 2;
-	  } else if ( b(i1,j1) == 2 ) {
-	    seqv[j1-1] = '-';
-	    i1 = i1 - 3;
-	    j1 = j1 - 2;
-	  } else {
-	    i1 = i1 - 1;
-	    j1 = j1 - 1;
-	  }
-	}
-	std::string seqs( seqv.begin(), seqv.end() );
-	result.push_back( seqs );
+        std::vector<char> seqv(n,'?');
+        int i1 = i;
+        int j1 = j;
+        while ( i1 >= 0 && j1 >= 0 ) {
+          seqv[j1] = seq[i1];
+          if ( b(i1,j1) == 1 ) {
+            seqv[j1-1] = '+';
+            i1 = i1 - 1;
+            j1 = j1 - 2;
+          } else if ( b(i1,j1) == 2 ) {
+            seqv[j1-1] = '-';
+            i1 = i1 - 3;
+            j1 = j1 - 2;
+          } else {
+            i1 = i1 - 1;
+            j1 = j1 - 1;
+          }
+        }
+        std::string seqs( seqv.begin(), seqv.end() );
+        result.push_back( seqs );
       }
 
   /*
@@ -295,7 +296,7 @@ Score_list<clipper::String> Ca_sequence::sequence_match( const std::vector<std::
       // get truncated alignment
       clipper::String subseq = seqtmp[i];
       std::pair<double,std::pair<int,int> > result_tmp =
-	sequence_score( scores, subseq );
+        sequence_score( scores, subseq );
       // truncate
       int r1 = result_tmp.second.first;
       int r2 = result_tmp.second.second;
@@ -314,10 +315,10 @@ Score_list<clipper::String> Ca_sequence::sequence_match( const std::vector<std::
     if ( matches.addable( matches_tmp[i].first ) ) {
       bool clash = false;
       for ( int j = 0; j < matches.size(); j++ )
-	if ( sequence_similarity( matches[j], matches_tmp[i].second ) > 0.25 )
-	  clash = true;
+        if ( sequence_similarity( matches[j], matches_tmp[i].second ) > 0.25 )
+          clash = true;
       if ( !clash )
-	matches.add( matches_tmp[i].first, matches_tmp[i].second );
+        matches.add( matches_tmp[i].first, matches_tmp[i].second );
     }
 
   // if first sequence is labelled, add the unmodified chain too.
@@ -328,11 +329,11 @@ Score_list<clipper::String> Ca_sequence::sequence_match( const std::vector<std::
     if ( s0.length() == s1.length() ) {
       int nmiss = 0;  // check that unmodified chain is different
       for ( int i = 0; i < s0.length(); i++ )
-	if ( isupper( s1[i] ) && s1[i] != s0[i] ) nmiss++;
+        if ( isupper( s1[i] ) && s1[i] != s0[i] ) nmiss++;
       if ( nmiss > 0 ) {
-	std::pair<double,std::pair<int,int> > result_tmp =
-	  sequence_score( scores, s0 );
-	matches.add( result_tmp.first, s0 );
+        std::pair<double,std::pair<int,int> > result_tmp =
+          sequence_score( scores, s0 );
+        matches.add( result_tmp.first, s0 );
       }
     }
   }
@@ -411,28 +412,28 @@ Score_list<clipper::String> Ca_sequence::sequence_chain( clipper::MChain& chain,
     for ( int r = 0; r < nres; r++ ) {
       Ca_group ca( chain[r] );
       if ( !ca.is_null() ) {
-	// score against prior
-	clipper::Coord_frac cf1, cf2;
-	clipper::Coord_orth co = ca.coord_cb();
-	atoms = nb.atoms_near( co, nb_rad );
-	cf1 = co.coord_frac( molprior.cell() );
-	for ( int i = 0; i < atoms.size(); i++ ) {
-	  const clipper::MAtom& atom = molprior.atom(atoms[i]);
-	  cf2 = atom.coord_orth().coord_frac( molprior.cell() );
-	  cf2 = molprior.spacegroup().symop( atoms[i].symmetry() ) * cf2;
-	  cf2 = cf2.lattice_copy_near( cf1 );
-	  double d2 = ( cf2 - cf1 ).lengthsq( molprior.cell() );
-	  if ( d2 <= nb_rad * nb_rad ) {
-	    int t = atoms[i].monomer();
-	    double rad = atom.u_iso();
-	    double w = atom.occupancy();
-	    double x = sqrt( d2 ) / rad;
-	    double f = 0.0;
-	    if      ( x < 1.0 ) f = 1.0 - 0.5 * clipper::Util::sqr( x );
-	    else if ( x < 2.0 ) f = 0.5 * clipper::Util::sqr( x - 2.0 );
-	    scores[r][t] = scores[r][t] - w * f;
-	  }
-	}
+        // score against prior
+        clipper::Coord_frac cf1, cf2;
+        clipper::Coord_orth co = ca.coord_cb();
+        atoms = nb.atoms_near( co, nb_rad );
+        cf1 = co.coord_frac( molprior.cell() );
+        for ( int i = 0; i < atoms.size(); i++ ) {
+          const clipper::MAtom& atom = molprior.atom(atoms[i]);
+          cf2 = atom.coord_orth().coord_frac( molprior.cell() );
+          cf2 = molprior.spacegroup().symop( atoms[i].symmetry() ) * cf2;
+          cf2 = cf2.lattice_copy_near( cf1 );
+          double d2 = ( cf2 - cf1 ).lengthsq( molprior.cell() );
+          if ( d2 <= nb_rad * nb_rad ) {
+            int t = atoms[i].monomer();
+            double rad = atom.u_iso();
+            double w = atom.occupancy();
+            double x = sqrt( d2 ) / rad;
+            double f = 0.0;
+            if      ( x < 1.0 ) f = 1.0 - 0.5 * clipper::Util::sqr( x );
+            else if ( x < 2.0 ) f = 0.5 * clipper::Util::sqr( x - 2.0 );
+            scores[r][t] = scores[r][t] - w * f;
+          }
+        }
       }
     }
   }
@@ -553,7 +554,10 @@ bool Ca_sequence::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
   for ( int chn = 0; chn < mol.size(); chn++ )
     if ( mol[chn].size() > 5 )
       for ( int res = 0; res < mol[chn].size(); res++ )
-	if ( mol[chn][res].type() != "UNK" ) num_seq++;
+        if ( mol[chn][res].type() != "UNK" ) num_seq++;
+
+  // trim trailing ends
+  trim( mol, seq );
 
   return true;
 }
@@ -573,8 +577,8 @@ clipper::String Ca_sequence::format() const
     if ( nhist > 0 ) {
       result += "Chain number: " + clipper::String( chn, 4 ) + "    length: " + clipper::String( int(history[chn][0].length()) ) + "\n";
       for ( int res = 0; res < nhist; res++ ) {
-	result += history[chn][res] + " \t" +
-	  clipper::String( history[chn].score(res), 10, 6 ) + "\n";
+        result += history[chn][res] + " \t" +
+          clipper::String( history[chn].score(res), 10, 6 ) + "\n";
       }
     }
   }
@@ -614,10 +618,10 @@ void Ca_sequence::set_prior_model( const clipper::MiniMol& mol )
     for ( int r = 0; r < mol[c].size(); r++ ) {
       Ca_group ca( mol[c][r] );
       if ( !ca.is_null() ) {
-	int t = ProteinTools::residue_index_3( mol[c][r].type() );
-	atom = atomcb;
-	atom.set_coord_orth( ca.coord_cb() );
-	mp[t].insert( atom );
+        int t = ProteinTools::residue_index_3( mol[c][r].type() );
+        atom = atomcb;
+        atom.set_coord_orth( ca.coord_cb() );
+        mp[t].insert( atom );
       }
     }
 
@@ -625,31 +629,82 @@ void Ca_sequence::set_prior_model( const clipper::MiniMol& mol )
   for ( int c = 0; c < mol.size(); c++ )
     for ( int r = 0; r < mol[c].size(); r++ )
       for ( int a = 0; a < mol[c][r].size(); a++ ) {
-	clipper::String atm = mol[c][r][a].id().trim();
-	clipper::String ele = mol[c][r][a].element();
-	bool override = ( mol[c].id() == "!" );
-	double u = clipper::Util::u2b( mol[c][r][a].u_iso() );
-	double o = mol[c][r][a].occupancy();
-	bool su = ( ele == "S"  || atm == "S"  || atm == "SG" || atm == "SD" );
-	bool se = ( ele == "SE" || atm == "SE" );
-	if ( su ) {
-	  atom = atomsu;
-	  atom.set_coord_orth( mol[c][r][a].coord_orth() );
-	  if ( override ) { atom.set_u_iso( u ); atom.set_occupancy( o ); }
-	  mp[ t_cys ].insert( atom );
-	}
-	if ( ( semet_ && se ) || ( !semet_ && su ) ) {
-	  atom = atomse;
-	  atom.set_coord_orth( mol[c][r][a].coord_orth() );
-	  if ( override ) { atom.set_u_iso( u ); atom.set_occupancy( o ); }
-	  mp[ t_met ].insert( atom );
-	}
+        clipper::String atm = mol[c][r][a].id().trim();
+        clipper::String ele = mol[c][r][a].element();
+        bool override = ( mol[c].id() == "!" );
+        double u = clipper::Util::u2b( mol[c][r][a].u_iso() );
+        double o = mol[c][r][a].occupancy();
+        bool su = ( ele == "S"  || atm == "S"  || atm == "SG" || atm == "SD" );
+        bool se = ( ele == "SE" || atm == "SE" );
+        if ( su ) {
+          atom = atomsu;
+          atom.set_coord_orth( mol[c][r][a].coord_orth() );
+          if ( override ) { atom.set_u_iso( u ); atom.set_occupancy( o ); }
+          mp[ t_cys ].insert( atom );
+        }
+        if ( ( semet_ && se ) || ( !semet_ && su ) ) {
+          atom = atomse;
+          atom.set_coord_orth( mol[c][r][a].coord_orth() );
+          if ( override ) { atom.set_u_iso( u ); atom.set_occupancy( o ); }
+          mp[ t_met ].insert( atom );
+        }
       }
 
   // Store the pseudo-chain
   molprior.insert( mp );
 }
 
+
+/* trim ends of chains which go beyond the end of the sequence */
+void Ca_sequence::trim( clipper::MiniMol& mol, const clipper::MMoleculeSequence& seq )
+{
+  std::vector<int> seqnums = ModelTidy::chain_renumber( mol, seq );
+  const int noff = 5;
+  const int ndel = 1;
+  // loop over chains
+  for ( int c = 0; c < mol.size(); c++ ) {
+    // no point messing with short or unsequenced chains
+    if ( seqnums[c] >= 0 && mol[c].size() > 5*noff ) {
+      clipper::String s = seq[seqnums[c]].sequence();
+      int n = mol[c].size()-1;
+      int m = s.length();
+      int r0, r1;
+      // deal with chain start
+      if ( ProteinTools::residue_index_3( mol[c][0     ].type() ) <  0 &&
+           ProteinTools::residue_index_3( mol[c][0+noff].type() ) >= 0 ) {
+        for ( r0 = 0; r0 <= 0+noff; r0++ )
+          if ( ProteinTools::residue_index_3( mol[c][r0].type() ) >= 0 ) break;
+        for ( r1 = r0-1; r1 >= 0; r1-- ) {
+          int i = r1-r0+mol[c][r0].seqnum()-1;
+          if ( i >= 0 && i < m )
+            mol[c][r1].set_type( ProteinTools::residue_code( s.substr(i,1) ) );
+          if ( i < 0 && i >= -ndel )
+            mol[c][r1].set_type( "~~~" );
+        }
+      }
+      // deal with chain end
+      if ( ProteinTools::residue_index_3( mol[c][n     ].type() ) <  0 &&
+           ProteinTools::residue_index_3( mol[c][n-noff].type() ) >= 0 ) {
+        for ( r0 = n; r0 >= n-noff; r0-- )
+          if ( ProteinTools::residue_index_3( mol[c][r0].type() ) >= 0 ) break;
+        for ( r1 = r0+1; r1 <= n; r1++ ) {
+          int i = r1-r0+mol[c][r0].seqnum()-1;
+          if ( i >= 0 && i < m )
+            mol[c][r1].set_type( ProteinTools::residue_code( s.substr(i,1) ) );
+          if ( i >= m && i < m+ndel )
+            mol[c][r1].set_type( "~~~" );
+        }
+      }
+      // remove flagged residues
+      clipper::MPolymer mp;
+      mp.copy( mol[c], clipper::MM::COPY_MP );
+      for ( int r = 0; r < mol[c].size(); r++ ) {
+        if ( mol[c][r].type() != "~~~" ) mp.insert( mol[c][r] );
+      }
+      mol[c] = mp;
+    }
+  }
+}
 
 
 // thread methods

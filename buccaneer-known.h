@@ -13,8 +13,7 @@
 class KnownStructure {
  public:
   //! Constructor: from model and arguments
-  KnownStructure( const clipper::MiniMol& mol,
-		  const std::vector<std::pair<clipper::String,double> >& ids );
+  KnownStructure( const clipper::MiniMol& mol, const std::vector<std::pair<clipper::String,double> >& ids, double nprad=-1.0 );
   //! Add known structure to existing structure
   bool copy_to( clipper::MiniMol& mol ) const;
   //! check for clashes against known model

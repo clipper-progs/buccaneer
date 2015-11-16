@@ -28,6 +28,7 @@ class Ca_sequence {
 
   static void set_semet( bool semet ) { semet_ = semet; }
   static void set_prior_model( const clipper::MiniMol& mol );
+  static void trim( clipper::MiniMol& mol, const clipper::MMoleculeSequence& seq );
 
   static void set_cpus( int cpus ) { ncpu = cpus; }
 

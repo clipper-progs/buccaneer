@@ -5,7 +5,7 @@
 #include "buccaneer-prot.h"
 
 
-KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<std::pair<clipper::String,double> >& ids )
+KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<std::pair<clipper::String,double> >& ids, double nprad )
 {
   // make null radius entries
   clipper::MiniMol tmp = mol;
@@ -13,7 +13,26 @@ KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<s
   for ( int p = 0; p < tmp.size(); p++ )
     for ( int m = 0; m < tmp[p].size(); m++ )
       for ( int a = 0; a < tmp[p][m].size(); a++ )
-	tmp[p][m][a].set_property( "RADI", PROP( nulrad ) );
+        tmp[p][m][a].set_property( "RADI", PROP( nulrad ) );
+
+  // fill in nonprotein atoms
+  if ( nprad >= 0.0 ) {
+    for ( int p = 0; p < tmp.size(); p++ ) {
+      for ( int m = 0; m < tmp[p].size(); m++ ) {
+        if ( tmp[p][m].lookup(" CA ",clipper::MM::ANY) < 0 ) {
+          bool sel = false;
+          if ( tmp[p][m].size() > 1 ) sel = true;
+          if ( tmp[p][m].size() == 1 && tmp[p][m][0].element() != "O" ) sel = true;
+          if ( sel ) {
+            for ( int a = 0; a < tmp[p][m].size(); a++ ) {
+              tmp[p][m][a].delete_property( "RADI" );
+              tmp[p][m][a].set_property( "RADI", PROP( nprad ) );
+            }
+          }
+        }
+      }
+    }
+  }
 
   // now fill in selected values
   radius_max = 0.0;
@@ -21,14 +40,13 @@ KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<s
     clipper::String sel = ids[id].first;
     double radius = ids[id].second;
     if ( radius > radius_max ) radius_max = radius;
-    std::vector<clipper::MAtomIndex> atoms =
-      tmp.select_atom_index( sel, clipper::MM::ANY );
+    std::vector<clipper::MAtomIndex> atoms = tmp.select_atom_index( sel, clipper::MM::ANY );
     for ( int a = 0; a < atoms.size(); a++ ) {
       clipper::MAtom& atom = tmp.atom( atoms[a] );
       double r = dynamic_cast<const PROP&>(atom.get_property("RADI")).value();
       if ( radius > r ) {
-	atom.delete_property( "RADI" );
-	atom.set_property( "RADI", PROP( radius ) );
+        atom.delete_property( "RADI" );
+        atom.set_property( "RADI", PROP( radius ) );
       }
     }
   }
@@ -46,9 +64,9 @@ KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<s
       clipper::MMonomer mm;
       mm.copy( tmp[p][m], clipper::MM::COPY_M );
       for ( int a = 0; a < tmp[p][m].size(); a++ ) {
-	const clipper::MAtom& atom = tmp[p][m][a];
-	double r = dynamic_cast<const PROP&>(atom.get_property("RADI")).value();
-	if ( r >= 0.0 ) mm.insert( atom );
+        const clipper::MAtom& atom = tmp[p][m][a];
+        double r = dynamic_cast<const PROP&>(atom.get_property("RADI")).value();
+        if ( r >= 0.0 ) mm.insert( atom );
       }
       if ( mm.size() > 0 ) mp.insert( mm );
     }
@@ -125,14 +143,14 @@ bool KnownStructure::prune( clipper::MiniMol& mol ) const
   for ( int chn = 0; chn < moltmp.size(); chn++ ) {
     for ( int res = 0; res < moltmp[chn].size(); res++ ) {
       for ( int atm = 0; atm < moltmp[chn][res].size(); atm++ ) {
-	const clipper::MAtom& atom = moltmp[chn][res][atm];
-	if ( atom.id() == " N  " || atom.id() == " CA " ||
-	     atom.id() == " C  " || atom.id() == " O  " ) {
-	  if ( clash( atom.coord_orth() ) ) {
-	    moltmp[chn][res].set_type( "~~~" );
-	    break;
-	  }
-	}
+        const clipper::MAtom& atom = moltmp[chn][res][atm];
+        if ( atom.id() == " N  " || atom.id() == " CA " ||
+             atom.id() == " C  " || atom.id() == " O  " ) {
+          if ( clash( atom.coord_orth() ) ) {
+            moltmp[chn][res].set_type( "~~~" );
+            break;
+          }
+        }
       }
     }
   }
@@ -144,10 +162,10 @@ bool KnownStructure::prune( clipper::MiniMol& mol ) const
     mp = mpnull;
     for ( int res = 0; res < moltmp[chn].size(); res++ ) {
       if ( moltmp[chn][res].type() != "~~~" ) {
-	mp.insert( moltmp[chn][res] );
+        mp.insert( moltmp[chn][res] );
       } else {
-	if ( mp.size() > 5 ) mol.insert( mp );
-	mp = mpnull;
+        if ( mp.size() > 5 ) mol.insert( mp );
+        mp = mpnull;
       }
     }
     if ( mp.size() > 5 ) mol.insert( mp );
@@ -170,8 +188,8 @@ void KnownStructure::debug() const
   for ( int chn = 0; chn < known.size(); chn++ ) {
     for ( int res = 0; res < known[chn].size(); res++ ) {
       for ( int atm = 0; atm < known[chn][res].size(); atm++ ) {
-	const double r = dynamic_cast<const PROP&>(known[chn][res][atm].get_property("RADI")).value();
-	std::cout << "/" << known[chn].id() << "/" << known[chn][res].id() << "/" << known[chn][res][atm].id() << " : " << r << std::endl;
+        const double r = dynamic_cast<const PROP&>(known[chn][res][atm].get_property("RADI")).value();
+        std::cout << "/" << known[chn].id() << "/" << known[chn][res].id() << "/" << known[chn][res][atm].id() << " : " << r << std::endl;
       }
     }
   }
