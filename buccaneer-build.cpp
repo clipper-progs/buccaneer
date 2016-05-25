@@ -17,7 +17,7 @@ void Ca_build::build_rotate_rotamer( clipper::MMonomer& mm, int nr, int nc )
     for ( int atm = 0; atm < mm.size(); atm++ ) {
       if ( mm[atm].name() == " N  " || mm[atm].name() == " CA " ||
 	   mm[atm].name() == " C  " || mm[atm].name() == " O  " ||
-	   mm[atm].name() == " CB " )
+	   ( mm.type() != "GLY" && mm[atm].name() == " CB " ) )
 	mm1.insert( mm[atm] );
     }
     mm = mm1;

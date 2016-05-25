@@ -557,7 +557,7 @@ bool Ca_sequence::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
         if ( mol[chn][res].type() != "UNK" ) num_seq++;
 
   // trim trailing ends
-  trim( mol, seq );
+  ModelTidy::trim( mol, seq );
 
   return true;
 }
@@ -652,58 +652,6 @@ void Ca_sequence::set_prior_model( const clipper::MiniMol& mol )
 
   // Store the pseudo-chain
   molprior.insert( mp );
-}
-
-
-/* trim ends of chains which go beyond the end of the sequence */
-void Ca_sequence::trim( clipper::MiniMol& mol, const clipper::MMoleculeSequence& seq )
-{
-  std::vector<int> seqnums = ModelTidy::chain_renumber( mol, seq );
-  const int noff = 5;
-  const int ndel = 1;
-  // loop over chains
-  for ( int c = 0; c < mol.size(); c++ ) {
-    // no point messing with short or unsequenced chains
-    if ( seqnums[c] >= 0 && mol[c].size() > 5*noff ) {
-      clipper::String s = seq[seqnums[c]].sequence();
-      int n = mol[c].size()-1;
-      int m = s.length();
-      int r0, r1;
-      // deal with chain start
-      if ( ProteinTools::residue_index_3( mol[c][0     ].type() ) <  0 &&
-           ProteinTools::residue_index_3( mol[c][0+noff].type() ) >= 0 ) {
-        for ( r0 = 0; r0 <= 0+noff; r0++ )
-          if ( ProteinTools::residue_index_3( mol[c][r0].type() ) >= 0 ) break;
-        for ( r1 = r0-1; r1 >= 0; r1-- ) {
-          int i = r1-r0+mol[c][r0].seqnum()-1;
-          if ( i >= 0 && i < m )
-            mol[c][r1].set_type( ProteinTools::residue_code( s.substr(i,1) ) );
-          if ( i < 0 && i >= -ndel )
-            mol[c][r1].set_type( "~~~" );
-        }
-      }
-      // deal with chain end
-      if ( ProteinTools::residue_index_3( mol[c][n     ].type() ) <  0 &&
-           ProteinTools::residue_index_3( mol[c][n-noff].type() ) >= 0 ) {
-        for ( r0 = n; r0 >= n-noff; r0-- )
-          if ( ProteinTools::residue_index_3( mol[c][r0].type() ) >= 0 ) break;
-        for ( r1 = r0+1; r1 <= n; r1++ ) {
-          int i = r1-r0+mol[c][r0].seqnum()-1;
-          if ( i >= 0 && i < m )
-            mol[c][r1].set_type( ProteinTools::residue_code( s.substr(i,1) ) );
-          if ( i >= m && i < m+ndel )
-            mol[c][r1].set_type( "~~~" );
-        }
-      }
-      // remove flagged residues
-      clipper::MPolymer mp;
-      mp.copy( mol[c], clipper::MM::COPY_MP );
-      for ( int r = 0; r < mol[c].size(); r++ ) {
-        if ( mol[c][r].type() != "~~~" ) mp.insert( mol[c][r] );
-      }
-      mol[c] = mp;
-    }
-  }
 }
 
 

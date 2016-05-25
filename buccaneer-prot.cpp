@@ -430,8 +430,8 @@ bool ProteinTools::chain_label( clipper::MiniMol& mol )
 {
   // set up default chain labels
   std::vector<clipper::String> labels;
-  labels.push_back( "ABCDEFGHIJKLMNOPQRSTUVWXYZ" );
-  labels.push_back( "abcdefghijklmnopqrstuvwxyz" );
+  labels.push_back( "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" );
+  labels.push_back( "0123456789" );
 
   // get existing labels
   clipper::String chainids = "";
@@ -449,6 +449,7 @@ bool ProteinTools::chain_label( clipper::MiniMol& mol )
 
   // label chains
   int label = 0;
+  std::vector<int> nresc( labels[1].length(), 0 );
   for ( int chn = 0; chn < mol.size(); chn++ ) {
     if ( label < labels[0].length() ) {
       if ( mol[chn].id() == "" ) {
@@ -458,10 +459,10 @@ bool ProteinTools::chain_label( clipper::MiniMol& mol )
     } else {
       int c = label - labels[0].length();
       int c1 = c % labels[1].length();
-      int c2 = c / labels[1].length();
       mol[chn].set_id( labels[1].substr( c1, 1 ) );
       for ( int res = 0; res < mol[chn].size(); res++ )
-        mol[chn][res].set_seqnum( res + 1 + 1000*c2 );
+        mol[chn][res].set_seqnum( res + nresc[c1] + 1 );
+      nresc[c1] += mol[chn].size()+5;
       label++;
     }
   }

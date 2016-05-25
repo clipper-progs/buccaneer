@@ -27,7 +27,7 @@ extern "C" {
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.6.1", "$Date: 2015/11/20" );
+  CCP4Program prog( "cbuccaneer", "1.6.3", "$Date: 2016/05/17" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2010 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -75,6 +75,7 @@ int main( int argc, char** argv )
   bool ncsbd = false;
   bool prune = false;
   bool build = false;
+  bool tidy  = false;
   bool fast   = false;  // further options
   bool semet  = false;
   bool doanis = false;
@@ -82,6 +83,7 @@ int main( int argc, char** argv )
   bool fixpos = false;
   bool correl = false;
   bool nocorrel = false;
+  clipper::MMDBManager::TYPE cifflag = clipper::MMDBManager::Default;
   double nprad = -1.0;
   double main_tgt_rad = 4.0;
   double side_tgt_rad = 5.5;
@@ -164,6 +166,8 @@ int main( int argc, char** argv )
       prune = true;
     } else if ( key == "-rebuild" ) {
       build = true;
+    } else if ( key == "-tidy" ) {
+      tidy = true;
     } else if ( key == "-fast" ) {
       fast = true;
     } else if ( key == "-build-semet" ) {
@@ -210,6 +214,8 @@ int main( int argc, char** argv )
       correl = true;
     } else if ( key == "-no-correlation-mode" ) {
       nocorrel = true;
+    } else if ( key == "-cif" ) {
+      cifflag =  clipper::MMDBManager::CIF;
     } else if ( key == "-model-filter" ) {
       model_filter = true;
     } else if ( key == "-mr-model" ) {
@@ -232,7 +238,7 @@ int main( int argc, char** argv )
     }
   }
   if ( args.size() <= 1 ) {
-    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-xmlout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-known-structure <atomid[,radius]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-no-correlation-mode\n\t-mr-model\n\t-mr-model-seed\n\t-mr-model-filter\n\t-mr-model-filter-sigma <sigma>\n\t-model-filter\n\t-model-filter-sigma <sigma>\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input model is extended.\n";
+    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-xmlout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-tidy\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-known-structure <atomid[,radius]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-no-correlation-mode\n\t-mr-model\n\t-mr-model-seed\n\t-mr-model-filter\n\t-mr-model-filter-sigma <sigma>\n\t-model-filter\n\t-model-filter-sigma <sigma>\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input model is extended.\n";
     exit(1);
   }
 
@@ -262,8 +268,8 @@ int main( int argc, char** argv )
   Ca_sequence::set_cpus( ncpu );
   Ca_sequence::set_semet( semet );
   Ca_find::TYPE findtype = fast ? Ca_find::SECSTRUC : Ca_find::LIKELIHOOD;
-  if ( !(find||grow||join||link||seqnc||corct||filtr||ncsbd||prune||build) )
-    find=grow=join=link=seqnc=corct=filtr=ncsbd=prune=build=true;
+  if ( !(find||grow||join||link||seqnc||corct||filtr||ncsbd||prune||build||tidy) )
+    find=grow=join=link=seqnc=corct=filtr=ncsbd=prune=build=tidy=true;
   if ( !( correl || nocorrel ) )
     correl = ( ippdb_wrk != "NONE" || ippdb_mr != "NONE" );
   if ( ipmtz_ref == "NONE" || ippdb_ref == "NONE" )
@@ -454,7 +460,7 @@ int main( int argc, char** argv )
     // Filter input model
     if ( model_filter ) {
       std::cout << " C-alphas before model filter:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
-      Ca_filter::filter( mol_wrk, model_filter_sig );
+      Ca_filter::filter( mol_wrk, xwrk, model_filter_sig );
       std::cout << " C-alphas after model filter:  " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
       log.log( "FLT ", mol_wrk, verbose>9 );
     }
@@ -518,7 +524,7 @@ int main( int argc, char** argv )
         log.log( "CORR", mol_wrk, verbose>9 );
       }
 
-      // filter poor density
+      //  poor density
       if ( filtr ) {
         Ca_filter cafiltr( 1.0 );
         cafiltr( mol_wrk, xwrk );
@@ -579,6 +585,17 @@ int main( int argc, char** argv )
     if ( fixpos )
       ProteinTools::symm_match( mol_wrk, mol_wrk_in );
 
+    // model tidy
+    if ( tidy ) {
+      // tidy chains and assign chain IDs
+      ModelTidy mtidy( 1.0, 12, newrestype, verbose > 6 );
+      bool chk = mtidy.tidy( mol_wrk, mol_mr, seq_wrk );
+      if ( !chk ) std::cout << "ModelTidy error" << std::endl; // can't happen
+      // rebuild side chains again due to possible change in sequence. FUTURE: flex side chains
+      //Ca_build cabuild( newrestype );  // , True?
+      //cabuild( mol_wrk, xwrk );
+    }
+
     // adjust residue names
     if ( newresname != "NONE" )
       for ( int c = 0; c < mol_wrk.size(); c++ )
@@ -586,10 +603,6 @@ int main( int argc, char** argv )
           if ( ProteinTools::residue_index_3( mol_wrk[c][r].type() ) < 0 )
             mol_wrk[c][r].set_type( newresname );
 
-    // model tidy
-    ModelTidy mtidy( 1.0, 12, verbose > 6 );
-    bool tidy = mtidy.tidy( mol_wrk, mol_mr, seq_wrk );
-    if ( !tidy ) std::cout << "ModelTidy error" << std::endl; // can't happen
     // add known structure from input model
     bool copy = knownstruc.copy_to( mol_wrk );
     if ( !copy ) std::cout << std::cout << "$TEXT:Warning: $$ $$\nWARNING: chain ID clash between known-structure and pdbin-mr. Chains renamed.\n$$" << std::endl;
@@ -599,7 +612,7 @@ int main( int argc, char** argv )
     // write answers
     clipper::MMDBfile mmdb;
     mmdb.export_minimol( mol_wrk );
-    mmdb.write_file( oppdb );
+    mmdb.write_file( oppdb, cifflag );
   }
 
   std::cout << "$TEXT:Result: $$ $$" << std::endl << msg << "$$" << std::endl;

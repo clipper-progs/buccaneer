@@ -10,6 +10,7 @@
 bool ModelTidy::tidy( clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, const clipper::MMoleculeSequence& seq ) const
 {
   std::vector<int> seqnums = chain_renumber( mol, seq );
+  sequence_correct( mol, seq, seqnums, newrestype_ );
   std::vector<int> chnnums = chain_assign( mol, mol_mr, seqnums, rmsd_, nmin_ );
   chain_move( mol, mol_mr, chnnums );
   return update_model( mol, mol_mr, chnnums );
@@ -47,6 +48,42 @@ bool ModelTidy::chain_move( clipper::MiniMol& mol, const clipper::MiniMol& mol_m
         }
     }
 
+  }
+  return true;
+}
+
+
+bool ModelTidy::sequence_correct( clipper::MiniMol& mol, const clipper::MMoleculeSequence& seq, const std::vector<int> seqnums, clipper::String newrestype )
+{
+  // deal with chain errors (can arise from copy_residue_types)
+  for ( int c = 0; c < mol.size(); c++ ) {
+    if ( seqnums[c] >= 0 ) {
+      clipper::String seq1 = ProteinTools::chain_sequence(mol[c]);
+      clipper::String seq2 = seq[seqnums[c]].sequence();
+
+      // ensure that '?'s don't match
+      for ( int i = 0; i < seq1.size(); i++ ) if ( seq1[i] == '?' ) seq1[i] = '1';
+      for ( int i = 0; i < seq2.size(); i++ ) if ( seq2[i] == '?' ) seq2[i] = '2';
+
+      // get the sequence alignment
+      clipper::MSequenceAlign align( clipper::MSequenceAlign::LOCAL, 1.0, -0.5, -1.0 );
+      std::pair<std::vector<int>,std::vector<int> > valign = align( seq1, seq2 );
+      const std::vector<int>& v1( valign.first );
+
+      // reject any bad matches
+      for ( int i1 = 0; i1 < seq1.size(); i1++ ) {
+        int i2 = v1[i1];
+        if ( i2 >= 0 && i2 < seq2.size() ) {
+          if ( isupper(seq1[i1]) && isupper(seq2[i2]) ) {
+            if ( seq1[i1] != seq2[i2] ) {
+              mol[c][i1].set_type(newrestype);
+              mol[c][i1].protein_sidechain_build_rotamer(0);
+              mol[c][i1].set_type("UNK");
+            }
+          }
+        }
+      }
+    }
   }
   return true;
 }
@@ -539,3 +576,66 @@ void ModelTidy::best_closed_ncs_group( const clipper::Array2d<int>& super, const
     used.pop_back();
   }
 }
+
+
+/* trim ends of chains which go beyond the end of the sequence */
+void ModelTidy::trim( clipper::MiniMol& mol, const clipper::MMoleculeSequence& seq )
+{
+  std::vector<int> seqnums = ModelTidy::chain_renumber( mol, seq );
+  const int noff = 5;
+  const int ndel = 1;
+  // loop over chains
+  for ( int c = 0; c < mol.size(); c++ ) {
+    // no point messing with short or unsequenced chains
+    if ( seqnums[c] >= 0 && mol[c].size() > 5*noff ) {
+      clipper::String s = seq[seqnums[c]].sequence();
+      int n = mol[c].size()-1;
+      int m = s.length();
+      int r0, r1;
+      // deal with chain start
+      if ( ProteinTools::residue_index_3( mol[c][0     ].type() ) <  0 &&
+           ProteinTools::residue_index_3( mol[c][0+noff].type() ) >= 0 ) {
+        for ( r0 = 0; r0 <= 0+noff; r0++ )
+          if ( ProteinTools::residue_index_3( mol[c][r0].type() ) >= 0 ) break;
+        for ( r1 = r0-1; r1 >= 0; r1-- ) {
+          int i = r1-r0+mol[c][r0].seqnum()-1;
+          if ( i >= 0 && i < m )
+            mol[c][r1].set_type( ProteinTools::residue_code( s.substr(i,1) ) );
+          if ( i < 0 && i >= -ndel )
+            mol[c][r1].set_type( "~~~" );
+        }
+      }
+      // deal with chain end
+      if ( ProteinTools::residue_index_3( mol[c][n     ].type() ) <  0 &&
+           ProteinTools::residue_index_3( mol[c][n-noff].type() ) >= 0 ) {
+        for ( r0 = n; r0 >= n-noff; r0-- )
+          if ( ProteinTools::residue_index_3( mol[c][r0].type() ) >= 0 ) break;
+        for ( r1 = r0+1; r1 <= n; r1++ ) {
+          int i = r1-r0+mol[c][r0].seqnum()-1;
+          if ( i >= 0 && i < m )
+            mol[c][r1].set_type( ProteinTools::residue_code( s.substr(i,1) ) );
+          if ( i >= m && i < m+ndel )
+            mol[c][r1].set_type( "~~~" );
+        }
+      }
+    }
+  }
+
+  // eliminate any sequences of less than 6 residues
+  clipper::MiniMol moltmp = mol;
+  mol = clipper::MiniMol( moltmp.spacegroup(), moltmp.cell() );
+  clipper::MPolymer mp, mpnull;
+  for ( int chn = 0; chn < moltmp.size(); chn++ ) {
+    mp = mpnull;
+    for ( int res = 0; res < moltmp[chn].size(); res++ ) {
+      if ( moltmp[chn][res].type() != "~~~" ) {
+        mp.insert( moltmp[chn][res] );
+      } else {
+        if ( mp.size() > 5 ) mol.insert( mp );
+        mp = mpnull;
+      }
+    }
+    if ( mp.size() > 5 ) mol.insert( mp );
+  }
+}
+

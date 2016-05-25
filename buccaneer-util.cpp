@@ -178,8 +178,8 @@ clipper::String BuccaneerLog::log( const clipper::MiniMol& mol, const clipper::M
       nrch++;
       if ( seqcounts[nc][nr] == 1 ) nunq++;
     }
-  double cres = double( nunq ) / double( nres );
-  double cchn = double( nunq ) / double( nrch );
+  double cres = double( nunq ) / double( std::max(nres,1) );
+  double cchn = double( nunq ) / double( std::max(nrch,1) );
   /*
   for ( int nc = 0; nc < seqcounts.size(); nc++ ) {
     std::cout << nc << " ";

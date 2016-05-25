@@ -11,7 +11,7 @@ class Ca_filter {
   Ca_filter( double sig_cut = 3.0 ) : sigcut(sig_cut) {}
   bool operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap ) const;
 
-  static bool filter( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, double sigcut );
+  static bool filter( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, double sigcut, bool keep=true );
   static bool filter( clipper::MiniMol& mol, double sigcut );
  private:
   double sigcut;
