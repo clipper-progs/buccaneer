@@ -605,7 +605,7 @@ int main( int argc, char** argv )
 
     // add known structure from input model
     bool copy = knownstruc.copy_to( mol_wrk );
-    if ( !copy ) std::cout << std::cout << "$TEXT:Warning: $$ $$\nWARNING: chain ID clash between known-structure and pdbin-mr. Chains renamed.\n$$" << std::endl;
+    if ( !copy ) std::cout << "$TEXT:Warning: $$ $$\nWARNING: chain ID clash between known-structure and pdbin-mr. Chains renamed.\n$$" << std::endl;
     // label unlabelled chains
     ProteinTools::chain_label( mol_wrk );
 
