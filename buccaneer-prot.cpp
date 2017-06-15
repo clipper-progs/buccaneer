@@ -439,7 +439,8 @@ bool ProteinTools::chain_label( clipper::MiniMol& mol )
     chainids = chainids + mol[chn].id();
 
   // eliminate labels used in known structure
-  for ( int i = 0; i < labels.size(); i++ ) {
+  //for ( int i = 0; i < labels.size(); i++ ) {
+  for ( int i = 0; i < 1; i++ ) {
     clipper::String newlabels;
     for ( int j = 0; j < labels[i].length(); j++ )
       if ( chainids.find( labels[i].substr(j,1) ) == clipper::String::npos )
@@ -449,21 +450,26 @@ bool ProteinTools::chain_label( clipper::MiniMol& mol )
 
   // label chains
   int label = 0;
-  std::vector<int> nresc( labels[1].length(), 0 );
   for ( int chn = 0; chn < mol.size(); chn++ ) {
-    if ( label < labels[0].length() ) {
-      if ( mol[chn].id() == "" ) {
+    if ( mol[chn].id() == "" ) {
+      // label chains with letters
+      if ( label < labels[0].length() ) {
         mol[chn].set_id( labels[0].substr( label, 1 ) );
         label++;
+      // pack remaining residues into numbered chains
+      } else {
+        int c0 = label - labels[0].length();
+        int c1 = c0 % labels[1].length();
+        clipper::String id = labels[1].substr( c1, 1 );
+        int rmax = 1;
+        for ( int c = 0; c < mol.size(); c++ )
+          if ( mol[c].id() == id )
+            rmax = std::max(rmax,mol[c][mol[c].size()-1].seqnum()+5);
+        mol[chn].set_id( id );
+        for ( int res = 0; res < mol[chn].size(); res++ )
+          mol[chn][res].set_seqnum( rmax + res );
+        label++;
       }
-    } else {
-      int c = label - labels[0].length();
-      int c1 = c % labels[1].length();
-      mol[chn].set_id( labels[1].substr( c1, 1 ) );
-      for ( int res = 0; res < mol[chn].size(); res++ )
-        mol[chn][res].set_seqnum( res + nresc[c1] + 1 );
-      nresc[c1] += mol[chn].size()+5;
-      label++;
     }
   }
   return true;

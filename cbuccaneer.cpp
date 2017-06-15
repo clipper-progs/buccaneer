@@ -27,10 +27,10 @@ extern "C" {
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.6.3", "$Date: 2016/05/17" );
+  CCP4Program prog( "cbuccaneer", "1.6.4", "$Date: 2016/06/15" );
   prog.set_termination_message( "Failed" );
 
-  std::cout << std::endl << "Copyright 2002-2010 Kevin Cowtan and University of York." << std::endl << std::endl;
+  std::cout << std::endl << "Copyright 2002-2017 Kevin Cowtan and University of York." << std::endl << std::endl;
   prog.summary_beg();
   std::cout << "$TEXT:Reference: $$ Please reference $$" << std::endl << std::endl << " 'Fitting molecular fragments into electron density'" << std::endl << " Cowtan K. (2008) Acta Cryst. D64, 83-89." << std::endl << std::endl << "$$" << std::endl;
   std::cout << "$TEXT:Reference: $$ Please reference $$" << std::endl << std::endl << " 'The Buccaneer software for automated model building'" << std::endl << " Cowtan K. (2006) Acta Cryst. D62, 1002-1011." << std::endl << std::endl << "$$" << std::endl;
