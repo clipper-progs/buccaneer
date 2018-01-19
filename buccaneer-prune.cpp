@@ -37,7 +37,7 @@ bool Ca_prune::prune( clipper::MiniMol& mol, double rad )
 
   // now loop over chains
   clipper::Coord_frac cf1, cf2;
-  for ( int chn1 = 0; chn1 < moltmp.size()-1; chn1++ ) {
+  for ( int chn1 = 0; chn1 < moltmp.size(); chn1++ ) {
     for ( int chn2 = chn1; chn2 < moltmp.size(); chn2++ ) {
       std::vector<int> score1 = score_positions( moltmp[chn1] );
       std::vector<int> score2 = score_positions( moltmp[chn2] );

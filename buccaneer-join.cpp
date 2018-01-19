@@ -143,7 +143,7 @@ bool Ca_join::join( clipper::MiniMol& mol, const double& rmerg, const double& rj
   } // loop over chains
 
   // now merge equivalent fragments
-  for ( int f1 = 0; f1 < fragments.size()-1; f1++ ) {
+  for ( int f1 = 0; f1 < fragments.size(); f1++ ) {  // NOT -1 (sign compare)
     clipper::Coord_frac cx0 = fragments[f1].res[0][1].coord_frac(cell);
     clipper::Coord_frac cx1 = fragments[f1].res[1][1].coord_frac(cell);
     clipper::Coord_frac cx2 = fragments[f1].res[2][1].coord_frac(cell);
