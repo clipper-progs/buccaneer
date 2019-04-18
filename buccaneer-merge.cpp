@@ -71,9 +71,7 @@ bool Ca_merge::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& x
           // test if the chain is improved
           const clipper::MPolymer& mp1 = mol[c1];
           const clipper::MPolymer& mp2 = mol_wrk[0];
-          int l0, l1, s0, s1;
-          l0 = mp1.size();
-          l1 = mp2.size();
+          int s0, s1;
           s0 = s1 = 0;
           for ( int r = 0; r < mp1.size(); r++ )
             if ( ProteinTools::residue_index_3( mp1[r].type() ) >= 0 ) s0++;

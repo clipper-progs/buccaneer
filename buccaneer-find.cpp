@@ -2,6 +2,7 @@
 /* (C) 2006 Kevin Cowtan & University of York all rights reserved */
 
 #include "buccaneer-find.h"
+#include "buccaneer-known.h"
 
 
 int Ca_find::ncpu = 0;
@@ -92,19 +93,19 @@ SSfind::Target::Target( SSfind::SSTYPE type, int num_residues )
 
   // set up targets
   float ta2[][2][3] = { { { 0.00, 0.00, 0.00}, { 2.50, 0.25, 0.00} },
-			{ { 0.87, 0.00, 1.23}, { 1.00,-1.75,-0.25} },
-			{ { 0.83, 0.00,-1.18}, { 0.25, 1.75, 0.50} } };
+                        { { 0.87, 0.00, 1.23}, { 1.00,-1.75,-0.25} },
+                        { { 0.83, 0.00,-1.18}, { 0.25, 1.75, 0.50} } };
   float ta3[][2][3] = { { { 0.00, 0.00, 0.00}, { 3.00, 0.00, 0.00} },
-			{ { 0.87, 0.00, 1.23}, {-1.00, 2.00, 0.25} } };
+                        { { 0.87, 0.00, 1.23}, {-1.00, 2.00, 0.25} } };
   float ta4[][2][3] = { { { 0.00, 0.00, 0.00}, { 0.75,-2.75, 0.00} },
-			{ { 0.87, 0.00, 1.23}, { 1.25,-2.75, 0.00} } };
+                        { { 0.87, 0.00, 1.23}, { 1.25,-2.75, 0.00} } };
   float tb2[][2][3] = { { { 0.00, 0.00, 0.00}, {-1.00, 0.00,-1.75} },
-			{ { 0.87, 0.00, 1.23}, { 2.00, 1.25, 0.50} },
-			{ { 0.83, 0.00,-1.18}, { 1.75,-1.50,-0.25} } };
+                        { { 0.87, 0.00, 1.23}, { 2.00, 1.25, 0.50} },
+                        { { 0.83, 0.00,-1.18}, { 1.75,-1.50,-0.25} } };
   float tb3[][2][3] = { { { 0.00, 0.00, 0.00}, { 2.00, 2.00,-0.25} },
-			{ { 0.87, 0.00, 1.23}, { 3.00, 0.50,-0.25} } };
+                        { { 0.87, 0.00, 1.23}, { 3.00, 0.50,-0.25} } };
   float tb4[][2][3] = { { { 0.00, 0.00, 0.00}, { 3.25, 0.50,-0.25} },
-			{ { 0.87, 0.00, 1.23}, { 3.25, 0.25, 0.00} } };
+                        { { 0.87, 0.00, 1.23}, { 3.25, 0.25, 0.00} } };
   typedef std::pair<clipper::Coord_orth,clipper::Coord_orth> Pair_coord;
   std::vector<Pair_coord> rep_co, all_co;
   double phi0, psi0;
@@ -112,43 +113,43 @@ SSfind::Target::Target( SSfind::SSTYPE type, int num_residues )
     for ( int i = 0; i < sizeof(ta2)/sizeof(ta2[0]); i++ )  // repr coords
       rep_co.push_back( Pair_coord(
         clipper::Coord_orth(ta2[i][0][0],ta2[i][0][1],ta2[i][0][2]),
-	clipper::Coord_orth(ta2[i][1][0],ta2[i][1][1],ta2[i][1][2]) ) );
+        clipper::Coord_orth(ta2[i][1][0],ta2[i][1][1],ta2[i][1][2]) ) );
     phi0 = clipper::Util::d2rad(-58.0); psi0 = clipper::Util::d2rad(-47.0);
   } else if ( type == ALPHA3 ) {
     for ( int i = 0; i < sizeof(ta3)/sizeof(ta3[0]); i++ )  // repr coords
       rep_co.push_back( Pair_coord(
         clipper::Coord_orth(ta3[i][0][0],ta3[i][0][1],ta3[i][0][2]),
-	clipper::Coord_orth(ta3[i][1][0],ta3[i][1][1],ta3[i][1][2]) ) );
+        clipper::Coord_orth(ta3[i][1][0],ta3[i][1][1],ta3[i][1][2]) ) );
     phi0 = clipper::Util::d2rad(-58.0); psi0 = clipper::Util::d2rad(-47.0);
   } else if ( type == ALPHA4 ) {
     for ( int i = 0; i < sizeof(ta4)/sizeof(ta4[0]); i++ )  // repr coords
       rep_co.push_back( Pair_coord(
         clipper::Coord_orth(ta4[i][0][0],ta4[i][0][1],ta4[i][0][2]),
-	clipper::Coord_orth(ta4[i][1][0],ta4[i][1][1],ta4[i][1][2]) ) );
+        clipper::Coord_orth(ta4[i][1][0],ta4[i][1][1],ta4[i][1][2]) ) );
     phi0 = clipper::Util::d2rad(-58.0); psi0 = clipper::Util::d2rad(-47.0);
   } else if ( type == BETA2 ) {
     for ( int i = 0; i < sizeof(tb2)/sizeof(tb2[0]); i++ )  // repr coords
       rep_co.push_back( Pair_coord(
         clipper::Coord_orth(tb2[i][0][0],tb2[i][0][1],tb2[i][0][2]),
-	clipper::Coord_orth(tb2[i][1][0],tb2[i][1][1],tb2[i][1][2]) ) );
+        clipper::Coord_orth(tb2[i][1][0],tb2[i][1][1],tb2[i][1][2]) ) );
     phi0 = clipper::Util::d2rad(-120.0); psi0 = clipper::Util::d2rad(120.0);
   } else if ( type == BETA3 ) {
     for ( int i = 0; i < sizeof(tb3)/sizeof(tb3[0]); i++ )  // repr coords
       rep_co.push_back( Pair_coord(
         clipper::Coord_orth(tb3[i][0][0],tb3[i][0][1],tb3[i][0][2]),
-	clipper::Coord_orth(tb3[i][1][0],tb3[i][1][1],tb3[i][1][2]) ) );
+        clipper::Coord_orth(tb3[i][1][0],tb3[i][1][1],tb3[i][1][2]) ) );
     phi0 = clipper::Util::d2rad(-120.0); psi0 = clipper::Util::d2rad(120.0);
   } else if ( type == BETA4 ) {
     for ( int i = 0; i < sizeof(tb4)/sizeof(tb4[0]); i++ )  // repr coords
       rep_co.push_back( Pair_coord(
         clipper::Coord_orth(tb4[i][0][0],tb4[i][0][1],tb4[i][0][2]),
-	clipper::Coord_orth(tb4[i][1][0],tb4[i][1][1],tb4[i][1][2]) ) );
+        clipper::Coord_orth(tb4[i][1][0],tb4[i][1][1],tb4[i][1][2]) ) );
     phi0 = clipper::Util::d2rad(-120.0); psi0 = clipper::Util::d2rad(120.0);
   } else {
     for ( int i = 0; i < sizeof(ta3)/sizeof(ta3[0]); i++ )  // repr coords
       rep_co.push_back( Pair_coord(
         clipper::Coord_orth(ta3[i][0][0],ta3[i][0][1],ta3[i][0][2]),
-	clipper::Coord_orth(ta3[i][1][0],ta3[i][1][1],ta3[i][1][2]) ) );
+        clipper::Coord_orth(ta3[i][1][0],ta3[i][1][1],ta3[i][1][2]) ) );
     phi0 = clipper::Util::d2rad(-58.0); psi0 = clipper::Util::d2rad(-47.0);
   }
 
@@ -182,7 +183,7 @@ SSfind::Target::Target( SSfind::SSTYPE type, int num_residues )
   for ( int i = 0; i < rep_co.size(); i++ )
     for ( int m = 0; m < ssops.size(); m++ )
       target_cs.push_back( Pair_coord( ssops[m] * rep_co[i].first,
-				       ssops[m] * rep_co[i].second ) );
+                                       ssops[m] * rep_co[i].second ) );
 
   // build ca coords
   calpha_cs.clear();
@@ -233,7 +234,7 @@ void SSfind::prep_search( const clipper::Xmap<float>& xmap, const double rhocut,
       df = df.symmetry_copy_near( xmap.spacegroup(), xmap.cell(), cf ) - cf;
       double r2 = df.lengthsq( xmap.cell() );
       if ( r2 < r2cut )
-	srctrn.push_back( grid.index( ix.coord() ) );
+        srctrn.push_back( grid.index( ix.coord() ) );
     }
 }
 
@@ -250,7 +251,7 @@ std::vector<SearchResult> SSfind::search( const std::vector<Pair_coord>& target_
       const clipper::Coord_map c1( grrot*(op*target_cs[i].first  ) );
       const clipper::Coord_map c2( grrot*(op*target_cs[i].second ) );
       tmp.push_back( std::pair<int,int>( mxgr.index(c1.coord_grid()) - i0,
-					 mxgr.index(c2.coord_grid()) - i0 ) );
+                                         mxgr.index(c2.coord_grid()) - i0 ) );
     }
     index_lists.push_back( tmp );
   }
@@ -271,20 +272,20 @@ std::vector<SearchResult> SSfind::search( const std::vector<Pair_coord>& target_
     const int index0 = mxgr.index( cg );                    // index in list
     if ( mapbox[index0] > rhocut ) {
       for ( int r = 0; r < index_lists.size(); r++ ) {      // loop over rotns
-	const std::vector<std::pair<int,int> >& index_list( index_lists[r] );
-	float hi = mapbox[index0+index_list[0].first ];
-	float lo = mapbox[index0+index_list[0].second];
-	int i = 1;
-	while ( hi - lo > bestlim ) {                     // loop over points
-	  hi = std::min( hi, mapbox[index0+index_list[i].first ] );
-	  lo = std::max( lo, mapbox[index0+index_list[i].second] );
-	  i++;
-	  if ( !( i < index_list.size() ) ) break;
-	}
-	if ( hi - lo > bestlim ) {
-	  bestlim = bestscr = hi - lo;
-	  bestrot = r;
-	}
+        const std::vector<std::pair<int,int> >& index_list( index_lists[r] );
+        float hi = mapbox[index0+index_list[0].first ];
+        float lo = mapbox[index0+index_list[0].second];
+        int i = 1;
+        while ( hi - lo > bestlim ) {                     // loop over points
+          hi = std::min( hi, mapbox[index0+index_list[i].first ] );
+          lo = std::max( lo, mapbox[index0+index_list[i].second] );
+          i++;
+          if ( !( i < index_list.size() ) ) break;
+        }
+        if ( hi - lo > bestlim ) {
+          bestlim = bestscr = hi - lo;
+          bestrot = r;
+        }
       }
     }
     rslts[i].score = bestscr;  // store
@@ -356,7 +357,7 @@ void Ca_find::filter_prior( clipper::Xmap<float>& prior, const int modelindex ) 
 }
 
 
-bool Ca_find::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const TYPE type, const int modelindex )
+bool Ca_find::operator() ( clipper::MiniMol& mol, const KnownStructure& knownstruc, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const TYPE type, const int modelindex )
 {
   typedef clipper::Xmap<float>::Map_reference_index MRI;
   const clipper::Spacegroup&    spgr = xmap.spacegroup();
@@ -365,9 +366,12 @@ bool Ca_find::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xm
   const clipper::MiniMol mold = mol;
 
   // make prior map
+  clipper::MiniMol mol_prior = clipper::MiniMol( xmap.spacegroup(), xmap.cell() );
+  for ( int p = 0; p < mold.size(); p++ ) mol_prior.insert( mold[p] );
+  knownstruc.copy_to( mol_prior, false );
   clipper::Xmap<float> prior( spgr, cell, grid );
-  if ( type == LIKELIHOOD ) prep_prior( prior, mold, 9.0 );
-  else                      prep_prior( prior, mold, 6.0 );
+  if ( type == LIKELIHOOD ) prep_prior( prior, mol_prior, 9.0 );
+  else                      prep_prior( prior, mol_prior, 6.0 );
 
   // turn the prior into a z-score
   for ( MRI ix = prior.first(); !ix.last(); ix.next() )
@@ -668,7 +672,7 @@ Search_threaded::Search_threaded( const clipper::Xmap<int>& xlookp1, const clipp
 void Search_threaded::search( const int& op )
 {
   Ca_find::search_op( results_, xmap1_, *xlookp1_, *srch_, *llktarget_, ops_,
-		      op );
+                      op );
 }
 
 bool Search_threaded::operator() ( int nthread )

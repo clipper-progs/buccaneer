@@ -3,6 +3,7 @@
 
 
 #include "buccaneer-prot.h"
+#include "buccaneer-known.h"
 #include "simplex-lib.h"
 
 #include <clipper/clipper-contrib.h>
@@ -21,7 +22,7 @@ class Ca_find {
  public:
   enum TYPE { LIKELIHOOD, SECSTRUC };
   Ca_find( int n_find = 500, double resol = 1.0 ) : nfind( n_find ), resol_( resol ) {}
-  bool operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const TYPE type = LIKELIHOOD, const int modelindex = 0 );
+  bool operator() ( clipper::MiniMol& mol, const KnownStructure& knownstruc, const clipper::Xmap<float>& xmap, const LLK_map_target& llktarget, const TYPE type = LIKELIHOOD, const int modelindex = 0 );
   static void set_cpus( int cpus ) { ncpu = cpus; }
 
  private:

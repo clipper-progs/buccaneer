@@ -347,7 +347,6 @@ Score_list<clipper::String> Ca_sequence::sequence_match( const std::vector<std::
   sequence ranges. */
 Score_list<clipper::String> Ca_sequence::sequence_chain( clipper::MChain& chain, const clipper::MMoleculeSequence& seq )
 {
-  typedef clipper::MMonomer Mm;
   int nres = chain.size();
 
   // for each chain, classify each residue against the density
@@ -521,8 +520,6 @@ Score_list<clipper::String> Ca_sequence::sequence( clipper::MChain& chain, const
 
 bool Ca_sequence::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq )
 {
-  typedef clipper::MMonomer Mm;
-
   // extract the necessary bits of the likelihood targets
   std::vector<LLK_map_target::Sampled> llksample( llktarget.size() );
   for ( int t = 0; t < llktarget.size(); t++ )

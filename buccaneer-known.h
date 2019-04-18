@@ -15,7 +15,7 @@ class KnownStructure {
   //! Constructor: from model and arguments
   KnownStructure( const clipper::MiniMol& mol, const std::vector<std::pair<clipper::String,double> >& ids, double nprad=-1.0 );
   //! Add known structure to existing structure
-  bool copy_to( clipper::MiniMol& mol ) const;
+  bool copy_to( clipper::MiniMol& mol, bool includeAll = true ) const;
   //! check for clashes against known model
   bool clash( const clipper::Coord_orth& coord ) const;
   //! prune model where it clashes with known model
@@ -26,6 +26,7 @@ class KnownStructure {
  private:
   typedef clipper::Property<double> PROP;
   clipper::MiniMol known;
+  clipper::MiniMol knownall;
   clipper::MAtomNonBond knownnb;
   double radius_max;
 };

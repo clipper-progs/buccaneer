@@ -27,7 +27,7 @@ extern "C" {
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.6.5", "$Date: 2018/01/19" );
+  CCP4Program prog( "cbuccaneer", "1.6.6", "$Date: 2019/04/10" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2017 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -243,9 +243,6 @@ int main( int argc, char** argv )
   }
 
   // other initialisations
-  typedef clipper::HKL_data_base::HKL_reference_index HRI;
-  typedef clipper::Xmap_base::Map_reference_index MRI;
-  typedef clipper::NXmap_base::Map_reference_index NRI;
   using clipper::data32::Compute_abcd_from_phifom;
   using clipper::data32::Compute_phifom_from_abcd;
   using clipper::data32::Compute_fphi_from_fsigf_phifom;
@@ -271,7 +268,7 @@ int main( int argc, char** argv )
   if ( !(find||grow||join||link||seqnc||corct||filtr||ncsbd||prune||build||tidy) )
     find=grow=join=link=seqnc=corct=filtr=ncsbd=prune=build=tidy=true;
   if ( !( correl || nocorrel ) )
-    correl = ( ippdb_wrk != "NONE" || ippdb_mr != "NONE" );
+    correl = ( ippdb_wrk != "NONE" || mr_model );
   if ( ipmtz_ref == "NONE" || ippdb_ref == "NONE" )
     BuccaneerUtil::set_reference( ipmtz_ref, ippdb_ref );
   BuccaneerLog log( title );
@@ -471,6 +468,9 @@ int main( int argc, char** argv )
       std::cout << " MR residues input: " << result[0] << ", after filter: " << result[1] << ", after seeding: " << result[2] << std::endl;
     }
 
+    // Trim input model to only protein residues
+    ProteinTools::trim_to_protein( mol_wrk );
+
     // model building loop
     for ( int cyc = 0; cyc < ncyc; cyc++ ) {
       std::cout << std::endl << "Cycle: " << cyc+1 << std::endl << std::endl;
@@ -478,7 +478,7 @@ int main( int argc, char** argv )
 
       // find C-alphas by slow likelihood search
       if ( find ) {
-        cafind( mol_wrk, xwrk, llktgt, findtype, modelindex );
+        cafind( mol_wrk, knownstruc, xwrk, llktgt, findtype, modelindex );
         std::cout << " C-alphas after finding:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
         log.log( "FIND", mol_wrk, verbose>9 );
       }
@@ -493,7 +493,7 @@ int main( int argc, char** argv )
     
       // join C-alphas
       if ( join ) {
-        Ca_join cajoin( 2.0 );
+        Ca_join cajoin( 2.0, 2.0 );
         cajoin( mol_wrk );
         std::cout << " C-alphas after joining:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
         log.log( "JOIN", mol_wrk, verbose>9 );
@@ -595,6 +595,14 @@ int main( int argc, char** argv )
       //Ca_build cabuild( newrestype );  // , True?
       //cabuild( mol_wrk, xwrk );
     }
+
+    // Assign default B-factors to missing values
+    float default_u_iso = ProteinTools::main_chain_u_mean( mol_wrk_in );
+    for ( int c = 0; c < mol_wrk.size(); c++ )
+      for ( int r = 0; r < mol_wrk[c].size(); r++ )
+        for ( int a = 0; a < mol_wrk[c][r].size(); a++ )
+          if ( clipper::Util::is_nan( mol_wrk[c][r][a].u_iso() ) )
+            mol_wrk[c][r][a].set_u_iso( default_u_iso );
 
     // adjust residue names
     if ( newresname != "NONE" )

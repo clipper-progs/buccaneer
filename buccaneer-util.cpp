@@ -50,26 +50,26 @@ void BuccaneerUtil::set_reference( clipper::String& mtz, clipper::String& pdb )
 void BuccaneerUtil::read_model( clipper::MiniMol& mol, clipper::String file, bool verbose )
 {
   const int mmdbflags = ( ::mmdb::MMDBF_IgnoreBlankLines |
-			  ::mmdb::MMDBF_IgnoreDuplSeqNum |
-			  ::mmdb::MMDBF_IgnoreNonCoorPDBErrors |
-			  ::mmdb::MMDBF_IgnoreRemarks );
+                          ::mmdb::MMDBF_IgnoreDuplSeqNum |
+                          ::mmdb::MMDBF_IgnoreNonCoorPDBErrors |
+                          ::mmdb::MMDBF_IgnoreRemarks );
   clipper::MMDBfile mmdb;
   mmdb.SetFlag( mmdbflags );
   if ( file != "NONE" ) {
     std::vector<clipper::String> files = file.split(",");
     for ( int f = 0; f < files.size(); f++ ) {
       try {
-	clipper::MiniMol moltmp;
-	mmdb.read_file( files[f] );
-	mmdb.import_minimol( moltmp );
-	clipper::Atom_list atoms = moltmp.atom_list();
-	std::cout << "PDB file: " << files[f] << std::endl;
-	std::cout << "  Number of atoms read: " << atoms.size() << std::endl;
-	for ( int c = 0; c < moltmp.size(); c++ )
-	  if ( moltmp[c].id() != "!" ) mol.insert( moltmp[c] );	
-	if ( verbose ) for ( int i = 0; i < atoms.size(); i += atoms.size()-1 ) printf("%i6  %4s  %8.3f %8.3f %8.3f\n", i, atoms[i].element().c_str(), atoms[i].coord_orth().x(), atoms[i].coord_orth().y(), atoms[i].coord_orth().z() );
+        clipper::MiniMol moltmp;
+        mmdb.read_file( files[f] );
+        mmdb.import_minimol( moltmp );
+        clipper::Atom_list atoms = moltmp.atom_list();
+        std::cout << "PDB file: " << files[f] << std::endl;
+        std::cout << "  Number of atoms read: " << atoms.size() << std::endl;
+        for ( int c = 0; c < moltmp.size(); c++ )
+          if ( moltmp[c].id() != "!" ) mol.insert( moltmp[c] );        
+        if ( verbose ) for ( int i = 0; i < atoms.size(); i += atoms.size()-1 ) printf("%i6  %4s  %8.3f %8.3f %8.3f\n", i, atoms[i].element().c_str(), atoms[i].coord_orth().x(), atoms[i].coord_orth().y(), atoms[i].coord_orth().z() );
       } catch ( clipper::Message_fatal ) {
-	std::cout << "FAILED TO READ PDB FILE: " << file << std::endl;
+        std::cout << "FAILED TO READ PDB FILE: " << file << std::endl;
       }
     }
   }
@@ -78,6 +78,7 @@ void BuccaneerUtil::read_model( clipper::MiniMol& mol, clipper::String file, boo
 
 #ifdef BUCCANEER_PROFILE
 #include <sys/times.h>
+#include <unistd.h>
 void BuccaneerLog::log( const clipper::String& id )
 {
   int i;
@@ -106,30 +107,30 @@ void BuccaneerLog::log( const clipper::String& id, const clipper::MiniMol& mol, 
   if ( view ) {
     for ( int c = 0; c < mol.size(); c++ )
       for ( int r = 0; r < mol[c].size(); r++ ) {
-	clipper::Coord_orth co(0.0,0.0,0.0);
-	for ( int a = 0; a < mol[c][r].size(); a++ )
-	  co += mol[c][r][a].coord_orth();
-	co = (1.0/mol[c][r].size()) * co;
-	std::cout << id << " " << c << "\t" << r << "\t" << co.format() << "\n";
-	std::cout << id << " " << mol[c][r].type() << " ";
-	for ( int a = 0; a < mol[c][r].size(); a++ )
-	  std::cout << mol[c][r][a].id() << " ";
-	std::cout << std::endl;
-	int cn = mol[c][r].lookup( " N  ", clipper::MM::ANY );
-	int ca = mol[c][r].lookup( " CA ", clipper::MM::ANY );
-	int cc = mol[c][r].lookup( " C  ", clipper::MM::ANY );
-	if ( ca >= 0 && cn >= 0 ) {
-	  double d2 = ( mol[c][r][ca].coord_orth() -
-			mol[c][r][cn].coord_orth() ).lengthsq();
-	  if ( d2 > 6.25 )
-	    std::cout << "BOND N-CA " << d2 << std::endl;
-	}
-	if ( ca >= 0 && cc >= 0 ) {
-	  double d2 = ( mol[c][r][ca].coord_orth() -
-			mol[c][r][cc].coord_orth() ).lengthsq();
-	  if ( d2 > 6.25 )
-	    std::cout << "BOND CA-C " << d2 << std::endl;
-	}
+        clipper::Coord_orth co(0.0,0.0,0.0);
+        for ( int a = 0; a < mol[c][r].size(); a++ )
+          co += mol[c][r][a].coord_orth();
+        co = (1.0/mol[c][r].size()) * co;
+        std::cout << id << " " << c << "\t" << r << "\t" << co.format() << "\n";
+        std::cout << id << " " << mol[c][r].type() << " ";
+        for ( int a = 0; a < mol[c][r].size(); a++ )
+          std::cout << mol[c][r][a].id() << " ";
+        std::cout << std::endl;
+        int cn = mol[c][r].lookup( " N  ", clipper::MM::ANY );
+        int ca = mol[c][r].lookup( " CA ", clipper::MM::ANY );
+        int cc = mol[c][r].lookup( " C  ", clipper::MM::ANY );
+        if ( ca >= 0 && cn >= 0 ) {
+          double d2 = ( mol[c][r][ca].coord_orth() -
+                        mol[c][r][cn].coord_orth() ).lengthsq();
+          if ( d2 > 6.25 )
+            std::cout << "BOND N-CA " << d2 << std::endl;
+        }
+        if ( ca >= 0 && cc >= 0 ) {
+          double d2 = ( mol[c][r][ca].coord_orth() -
+                        mol[c][r][cc].coord_orth() ).lengthsq();
+          if ( d2 > 6.25 )
+            std::cout << "BOND CA-C " << d2 << std::endl;
+        }
       }
   }
   log( id );
@@ -167,10 +168,10 @@ clipper::String BuccaneerLog::log( const clipper::MiniMol& mol, const clipper::M
     int nc = chnnums[c];
     if ( nc >= 0 ) {
       for ( int r = 0; r < mol_wrk[c].size(); r++ )
-	if ( mol_wrk[c][r].lookup( " CA ", clipper::MM::ANY ) >= 0 ) {
-	  int nr = mol_wrk[c][r].seqnum() - 1;
-	  if ( nr >= 0 && nr < seqcounts[nc].size() ) seqcounts[nc][nr]++;
-	}
+        if ( mol_wrk[c][r].lookup( " CA ", clipper::MM::ANY ) >= 0 ) {
+          int nr = mol_wrk[c][r].seqnum() - 1;
+          if ( nr >= 0 && nr < seqcounts[nc].size() ) seqcounts[nc][nr]++;
+        }
     }
   }
   for ( int nc = 0; nc < seqcounts.size(); nc++ )

@@ -782,6 +782,25 @@ std::vector<float> ProteinTools::main_chain_u_values( const clipper::MPolymer& m
   return scores;
 }
 
+// Return the mean u_iso of all N, CA and C atoms
+// If none exist return a default value of 0.5
+float ProteinTools::main_chain_u_mean( const clipper::MiniMol& mol )
+{
+  float total = 0;
+  int count = 0;
+  for ( int c = 0; c < mol.size(); c++ ) {
+    for ( int r = 0; r < mol[c].size(); r++ ) {
+      for ( int a = 0; a < mol[c][r].size(); a++ ) {
+        clipper::String id = mol[c][r][a].id();
+        if ( id == " N  " || id == " CA " || id == " C  " ) {
+          total += mol[c][r][a].u_iso();
+          count++;
+        }
+      }
+    }
+  }
+  return count > 0 ? total / count : 0.5;
+}
 
 bool ProteinTools::split_chains_at_gap( clipper::MiniMol& mol )
 {
@@ -983,4 +1002,76 @@ clipper::String ProteinTools::residue_code( clipper::String code, bool translate
   if ( code.length() == 3 )
     return residue_code_1( residue_index_3( code, translate ) );
   return "";
+}
+
+std::vector<Ca_chain> ProteinTools::ca_chains( const clipper::MiniMol& mol )
+{
+  std::vector<Ca_chain> chains;
+  Ca_chain chain;
+  for ( int chn = 0; chn < mol.size(); chn++ )
+    for ( int res = 0; res < mol[chn].size(); res++ ) {
+      Ca_group ca( mol[chn][res] );
+      if ( !ca.is_null() ) {
+        // check if we must start a new chain
+        if ( chain.size() > 0 )
+          if ( (chain.back().coord_c()-ca.coord_n()).lengthsq() > 2.25 ) {
+            chains.push_back( chain );
+            chain.clear();
+          }
+        // add this atom to chain
+        chain.push_back( ca );
+      }
+    }
+  if ( chain.size() > 0 ) chains.push_back( chain );
+  return chains;
+}
+
+void ProteinTools::insert_ca_chains( clipper::MiniMol& mol, const std::vector<Ca_chain>& chains )
+{
+  for ( int chn = 0; chn < chains.size(); chn++ ) {
+    clipper::MPolymer chain;
+    int ires = 1;
+    for ( int res = 0; res < chains[chn].size(); res++ ) {
+      clipper::MMonomer residue;
+      residue.set_type("UNK");
+      clipper::MAtom atom = clipper::Atom::null();
+      atom.set_occupancy(1.0);
+      atom.set_u_iso( clipper::Util::nan() );
+
+      atom.set_element( "N" );
+      atom.set_id( "N" );
+      atom.set_coord_orth( chains[chn][res].coord_n() );
+      residue.insert( atom );
+
+      atom.set_element( "C" );
+      atom.set_id( "CA" );
+      atom.set_coord_orth( chains[chn][res].coord_ca() );
+      residue.insert( atom );
+
+      atom.set_id( "C" );
+      atom.set_coord_orth( chains[chn][res].coord_c() );
+      residue.insert( atom );
+
+      residue.set_seqnum( ires++ );
+      chain.insert( residue );
+    }
+    mol.insert( chain );
+  }
+}
+
+void ProteinTools::trim_to_protein( clipper::MiniMol& mol )
+{
+    clipper::MiniMol mold = mol;
+    mol = clipper::MiniMol( mold.spacegroup(), mold.cell() );
+    for ( int chn = 0; chn < mold.size(); chn++ ) {
+      clipper::MPolymer mp;
+      for ( int res = 0; res < mold[chn].size(); res++ ) {
+        int in = mold[chn][res].lookup( " N  ", clipper::MM::ANY );
+        int ia = mold[chn][res].lookup( " CA ", clipper::MM::ANY );
+        int ic = mold[chn][res].lookup( " C  ", clipper::MM::ANY );
+        if ( in >= 0 && ia >= 0 && ic >= 0 )
+          mp.insert( mold[chn][res] );
+      }
+      if ( mp.size() > 0 ) mol.insert( mp );
+    }
 }

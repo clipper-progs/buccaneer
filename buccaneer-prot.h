@@ -162,9 +162,13 @@ class ProteinTools {
   static bool symm_match( clipper::MiniMol& molwrk, const clipper::MiniMol& molref );
   static std::vector<float> main_chain_densities( const clipper::MPolymer& mp, const clipper::Xmap<float>& xmap, int nsmooth=0 );
   static std::vector<float> main_chain_u_values( const clipper::MPolymer& mp, int nsmooth=0 );
+  static float main_chain_u_mean( const clipper::MiniMol& mol );
   static bool split_chains_at_gap( clipper::MiniMol& mol );
   static bool split_chains_at_unk( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap );
   static bool tidy_peptide_bond( clipper::MMonomer& mm1, clipper::MMonomer& mm2 );
+  static std::vector<Ca_chain> ca_chains( const clipper::MiniMol& mol );
+  static void insert_ca_chains( clipper::MiniMol& mol, const std::vector<Ca_chain>& chains );
+  static void trim_to_protein( clipper::MiniMol& mol );
  private:
   class MapFilterFn_g5 : public clipper::MapFilterFn_base { public:
     clipper::ftype operator() ( const clipper::ftype& radius ) const { return exp(-radius*radius/50.0); }

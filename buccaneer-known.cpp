@@ -22,7 +22,7 @@ KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<s
         if ( tmp[p][m].lookup(" CA ",clipper::MM::ANY) < 0 ) {
           bool sel = false;
           if ( tmp[p][m].size() > 1 ) sel = true;
-          if ( tmp[p][m].size() == 1 && tmp[p][m][0].element() != "O" ) sel = true;
+          if ( tmp[p][m].size() == 1 && tmp[p][m][0].element().trim() != "O" ) sel = true;
           if ( sel ) {
             for ( int a = 0; a < tmp[p][m].size(); a++ ) {
               tmp[p][m][a].delete_property( "RADI" );
@@ -35,7 +35,7 @@ KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<s
   }
 
   // now fill in selected values
-  radius_max = 0.0;
+  radius_max = nprad > 0.0 ? nprad : 0.0;
   for ( int id = 0; id < ids.size(); id++ ) {
     clipper::String sel = ids[id].first;
     double radius = ids[id].second;
@@ -56,21 +56,29 @@ KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<s
   //  all pass-through atoms will have RADI = 0,
   //  all protect atoms will have RADI > 0
   // now make a new molecule with just the atoms of interest
+  //  known contains RADI > 0 atoms
+  //  knownall contains RADI >= 0 atoms
   known.init( tmp.spacegroup(), tmp.cell() );
+  knownall.init( tmp.spacegroup(), tmp.cell() );
   for ( int p = 0; p < tmp.size(); p++ ) {
-    clipper::MPolymer mp;
+    clipper::MPolymer mp, mpall;
     mp.copy( tmp[p], clipper::MM::COPY_M );
+    mpall.copy( tmp[p], clipper::MM::COPY_M );
     for ( int m = 0; m < tmp[p].size(); m++ ) {
-      clipper::MMonomer mm;
+      clipper::MMonomer mm, mmall;
       mm.copy( tmp[p][m], clipper::MM::COPY_M );
+      mmall.copy( tmp[p][m], clipper::MM::COPY_M );
       for ( int a = 0; a < tmp[p][m].size(); a++ ) {
         const clipper::MAtom& atom = tmp[p][m][a];
         double r = dynamic_cast<const PROP&>(atom.get_property("RADI")).value();
-        if ( r >= 0.0 ) mm.insert( atom );
+        if ( r > 0.0 ) mm.insert( atom );
+        if ( r >= 0.0 ) mmall.insert( atom );
       }
       if ( mm.size() > 0 ) mp.insert( mm );
+      if ( mmall.size() > 0 ) mpall.insert( mmall );
     }
     if ( mp.size() > 0 ) known.insert( mp );
+    if ( mpall.size() > 0 ) knownall.insert( mpall );
   }
 
   // make non-bond object
@@ -78,18 +86,19 @@ KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<s
 }
 
 
-bool KnownStructure::copy_to( clipper::MiniMol& mol ) const
+bool KnownStructure::copy_to( clipper::MiniMol& mol, bool includeAll ) const
 {
+  clipper::MiniMol prior = includeAll ? knownall : known;
+
   // check for id clash
   bool idclash = false;
   for ( int c1 = 0; c1 < mol.size(); c1++ )
-    for ( int c2 = 0; c2 < known.size(); c2++ )
-      if ( mol[c1].id() == known[c2].id() ) idclash = true;
+    for ( int c2 = 0; c2 < prior.size(); c2++ )
+      if ( mol[c1].id() == prior[c2].id() ) idclash = true;
   if ( idclash )
     for ( int c1 = 0; c1 < mol.size(); c1++ ) mol[c1].set_id( "" );
 
-  // combine known and built chains
-  clipper::MiniMol prior = known;
+  // combine prior and built chains
   clipper::MiniMol built = mol;
   ProteinTools::symm_match( prior, built );
   mol = clipper::MiniMol( built.spacegroup(), built.cell() );
@@ -185,11 +194,11 @@ std::pair<clipper::String,double> KnownStructure::parse( clipper::String arg )
 
 void KnownStructure::debug() const
 {
-  for ( int chn = 0; chn < known.size(); chn++ ) {
-    for ( int res = 0; res < known[chn].size(); res++ ) {
-      for ( int atm = 0; atm < known[chn][res].size(); atm++ ) {
-        const double r = dynamic_cast<const PROP&>(known[chn][res][atm].get_property("RADI")).value();
-        std::cout << "/" << known[chn].id() << "/" << known[chn][res].id() << "/" << known[chn][res][atm].id() << " : " << r << std::endl;
+  for ( int chn = 0; chn < knownall.size(); chn++ ) {
+    for ( int res = 0; res < knownall[chn].size(); res++ ) {
+      for ( int atm = 0; atm < knownall[chn][res].size(); atm++ ) {
+        const double r = dynamic_cast<const PROP&>(knownall[chn][res][atm].get_property("RADI")).value();
+        std::cout << "/" << knownall[chn].id() << "/" << knownall[chn][res].id() << "/" << knownall[chn][res][atm].id() << " : " << r << std::endl;
       }
     }
   }

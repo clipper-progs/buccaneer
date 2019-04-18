@@ -21,24 +21,8 @@ bool Ca_grow::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xm
 {
   const clipper::MiniMol mold = mol;
 
-  // loop over chains, finding starting chains to expand
-  std::vector<Ca_chain> chains;
-  Ca_chain chain;
-  for ( int chn = 0; chn < mold.size(); chn++ )
-    for ( int res = 0; res < mold[chn].size(); res++ ) {
-      Ca_group ca( mold[chn][res] );
-      if ( !ca.is_null() ) {
-	// check if we must start a new chain
-	if ( chain.size() > 0 )
-	  if ( (chain.back().coord_c()-ca.coord_n()).lengthsq() > 2.25 ) {
-	    chains.push_back( chain );
-	    chain.clear();
-	  }
-	// add this atom to chain
-	chain.push_back( ca );
-      }
-    }
-  if ( chain.size() > 0 ) chains.push_back( chain );
+  // Find starting chains to expand
+  std::vector<Ca_chain> chains = ProteinTools::ca_chains( mold );
 
   // establish map statistics to determine stopping value for building
   double cutoff = llktarget.llk_distribution( 0.01 );
@@ -48,7 +32,7 @@ bool Ca_grow::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xm
   clipper::Ramachandran rama1( clipper::Ramachandran::All );
   clipper::Ramachandran rama2( clipper::Ramachandran::NonGly );
   for ( int chn = 0; chn < chains.size(); chn++ )
-    grow( chains[chn], xmap, llktarget,	rama1, rama2, cutoff, ngrow );
+    grow( chains[chn], xmap, llktarget,        rama1, rama2, cutoff, ngrow );
   */
   Grow_threaded grow( chains, xmap, llktarget, cutoff, ngrow );
   grow( ncpu );
@@ -56,35 +40,7 @@ bool Ca_grow::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xm
 
   // make a new mmdb
   mol = clipper::MiniMol( mold.spacegroup(), mold.cell() );
-  for ( int chn = 0; chn < chains.size(); chn++ ) {
-    clipper::MPolymer chain;
-    int ires = 1;
-    for ( int res = 0; res < chains[chn].size(); res++ ) {
-      clipper::MMonomer residue;
-      residue.set_type("UNK");
-      clipper::MAtom atom = clipper::Atom::null();
-      atom.set_occupancy(1.0);
-      atom.set_u_iso( 0.5 );
-
-      atom.set_element( "N" );
-      atom.set_id( "N" );
-      atom.set_coord_orth( chains[chn][res].coord_n() );
-      residue.insert( atom );
-
-      atom.set_element( "C" );
-      atom.set_id( "CA" );
-      atom.set_coord_orth( chains[chn][res].coord_ca() );
-      residue.insert( atom );
-
-      atom.set_id( "C" );
-      atom.set_coord_orth( chains[chn][res].coord_c() );
-      residue.insert( atom );
-
-      residue.set_seqnum( ires++ );
-      chain.insert( residue );
-    }
-    mol.insert( chain );
-  }
+  ProteinTools::insert_ca_chains( mol, chains );
 
   // restore the residue types, if any
   ProteinTools::copy_residue_types( mol, mold );
@@ -127,9 +83,9 @@ Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   for ( conf1.r1.psi = 0.0; conf1.r1.psi < deg360; conf1.r1.psi += deg20 )
     for ( conf1.r1.phi = 0.0; conf1.r1.phi < deg360; conf1.r1.phi += deg20 )
       if ( phi0 < -6.283 || rama1.allowed( phi0, conf1.r1.psi ) ) {
-	ca1 = ca0.next_ca_group( conf1.r1.psi, conf1.r1.phi );
-	r1 = llktarget.llk_approx( xmap, ca1.rtop_from_std_ori() );
-	scores_l1.add( r1, conf1 );
+        ca1 = ca0.next_ca_group( conf1.r1.psi, conf1.r1.phi );
+        r1 = llktarget.llk_approx( xmap, ca1.rtop_from_std_ori() );
+        scores_l1.add( r1, conf1 );
       }
   // seach all conformations of second residue using best confirmations of first
   for ( int l1 = 0; l1 < scores_l1.size(); l1++ ) {
@@ -138,11 +94,11 @@ Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
     ca1 = ca0.next_ca_group( conf2.r1.psi, conf2.r1.phi );
     for ( conf2.r2.psi = 0.0; conf2.r2.psi < deg360; conf2.r2.psi += deg20 )
       for ( conf2.r2.phi = 0.0; conf2.r2.phi < deg360; conf2.r2.phi += deg30 )
-	if ( rama2.favored( conf2.r1.phi, conf2.r2.psi ) ) {
-	  ca2 = ca1.next_ca_group( conf2.r2.psi, conf2.r2.phi );
-	  r2 = llktarget.llk_approx( xmap, ca2.rtop_from_std_ori() );
-	  scores_l2.add( r1+r2, conf2 );
-	}
+        if ( rama2.favored( conf2.r1.phi, conf2.r2.psi ) ) {
+          ca2 = ca1.next_ca_group( conf2.r2.psi, conf2.r2.phi );
+          r2 = llktarget.llk_approx( xmap, ca2.rtop_from_std_ori() );
+          scores_l2.add( r1+r2, conf2 );
+        }
   }
   //return ca0.next_ca_group( scores_l2[0].r1.psi, scores_l2[0].r1.phi );
   if ( scores_l2.size() == 0 ) return Ca_group::null();
@@ -153,7 +109,7 @@ Ca_group Ca_grow::next_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
     ca1 = ca0.next_ca_group( scores_l2[l2].r1.psi, scores_l2[l2].r1.phi );
     ca2 = ca1.next_ca_group( scores_l2[l2].r2.psi, scores_l2[l2].r2.phi );
     r1 = ( llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
-	   llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
+           llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
     if ( r1 < ll_best ) {
       ll_best = r1;
       ra_best = scores_l2[l2];
@@ -193,8 +149,8 @@ Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
   for ( conf1.r1.phi = 0.0; conf1.r1.phi < deg360; conf1.r1.phi += deg20 ) 
     for ( conf1.r1.psi = 0.0; conf1.r1.psi < deg360; conf1.r1.psi += deg20 )
       if ( psi0 < -6.283 || rama1.allowed( conf1.r1.phi, psi0 ) ) {
-	ca1 = ca0.prev_ca_group( conf1.r1.phi, conf1.r1.psi );
-	r1 = llktarget.llk_approx( xmap, ca1.rtop_from_std_ori() );
+        ca1 = ca0.prev_ca_group( conf1.r1.phi, conf1.r1.psi );
+        r1 = llktarget.llk_approx( xmap, ca1.rtop_from_std_ori() );
       scores_l1.add( r1, conf1 );
     }
   // seach all conformations of second residue using best confirmations of first
@@ -204,11 +160,11 @@ Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
     ca1 = ca0.prev_ca_group( conf2.r1.phi, conf2.r1.psi );
     for ( conf2.r2.phi = 0.0; conf2.r2.phi < deg360; conf2.r2.phi += deg20 )
       for ( conf2.r2.psi = 0.0; conf2.r2.psi < deg360; conf2.r2.psi += deg30 )
-	if ( rama2.favored( conf2.r2.phi, conf2.r1.psi) ) {
-	  ca2 = ca1.prev_ca_group( conf2.r2.phi, conf2.r2.psi );
-	  r2 = llktarget.llk_approx( xmap, ca2.rtop_from_std_ori() );
-	  scores_l2.add( r1+r2, conf2 );
-	}
+        if ( rama2.favored( conf2.r2.phi, conf2.r1.psi) ) {
+          ca2 = ca1.prev_ca_group( conf2.r2.phi, conf2.r2.psi );
+          r2 = llktarget.llk_approx( xmap, ca2.rtop_from_std_ori() );
+          scores_l2.add( r1+r2, conf2 );
+        }
   }
   //return ca0.prev_ca_group( scores_l2[0].r1.phi, scores_l2[0].r1.psi );
   if ( scores_l2.size() == 0 ) return Ca_group::null();
@@ -219,7 +175,7 @@ Ca_group Ca_grow::prev_ca_group( const Ca_chain& chain, const clipper::Xmap<floa
     ca1 = ca0.prev_ca_group( scores_l2[l2].r1.phi, scores_l2[l2].r1.psi );
     ca2 = ca1.prev_ca_group( scores_l2[l2].r2.phi, scores_l2[l2].r2.psi );
     r1 = ( llktarget.llk( xmap, ca1.rtop_from_std_ori() ) +
-	   llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
+           llktarget.llk( xmap, ca2.rtop_from_std_ori() ) );
     if ( r1 < ll_best ) {
       ll_best = r1;
       ra_best = scores_l2[l2];
@@ -261,7 +217,7 @@ Grow_threaded::Grow_threaded( const std::vector<Ca_chain>& chains, const clipper
 void Grow_threaded::grow( const int& chn )
 {
   Ca_grow::grow( chains_[chn], *xmap_, *llktarget_,
-		 rama1, rama2, cutoff_, ngrow );
+                 rama1, rama2, cutoff_, ngrow );
   done[chn] = true;
 }
 
@@ -328,7 +284,7 @@ double Target_fn_refine_n_terminal_build::operator() ( const std::vector<double>
   const Ca_group ca1 = ca0.prev_ca_group( args[0], args[1] );
   const Ca_group ca2 = ca1.prev_ca_group( args[2], args[3] );
   double r = ( (*llktarget_).llk( *xmap_, ca1.rtop_from_std_ori() ) +
-	       (*llktarget_).llk( *xmap_, ca2.rtop_from_std_ori() ) );
+               (*llktarget_).llk( *xmap_, ca2.rtop_from_std_ori() ) );
   if ( !rama1.allowed( args[0], psi0 ) ) 
     if ( psi0 > -6.283 ) r += 10.0;
   if ( !rama2.favored( args[2], args[1] ) )
@@ -376,7 +332,7 @@ double Target_fn_refine_c_terminal_build::operator() ( const std::vector<double>
   const Ca_group ca1 = ca0.next_ca_group( args[0], args[1] );
   const Ca_group ca2 = ca1.next_ca_group( args[2], args[3] );
   double r = ( (*llktarget_).llk( *xmap_, ca1.rtop_from_std_ori() ) +
-	       (*llktarget_).llk( *xmap_, ca2.rtop_from_std_ori() ) );
+               (*llktarget_).llk( *xmap_, ca2.rtop_from_std_ori() ) );
   if ( !rama1.allowed( phi0,    args[0] ) ) 
     if ( phi0 > -6.283 ) r += 10.0;
   if ( !rama2.favored( args[1], args[2] ) )
