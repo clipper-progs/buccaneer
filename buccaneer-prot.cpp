@@ -431,8 +431,8 @@ bool ProteinTools::chain_label( clipper::MiniMol& mol, clipper::MMDBManager::TYP
   std::vector<clipper::String> labels;
   labels.push_back( "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" );
   labels.push_back( "0123456789" );
-  bool lbl_alpha[53][52] = {0};
-  bool lbl_num[10][10] = {0};
+  bool lbl_alpha[53][52] = {{0}};
+  bool lbl_num[10][10]   = {{0}};
 
   // get existing labels
   for ( int chn = 0; chn < mol.size(); chn++ )
