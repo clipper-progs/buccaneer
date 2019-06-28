@@ -362,9 +362,9 @@ clipper::RTop_orth ProteinTools::superpose( const clipper::MPolymer& mp1, const 
 
   /*
   std::cout << seq1 << std::endl;
-  for ( int i = 0; i < seq1.size(); i++ ) if ( v1[i] >= 0 ) std::cout << "|"; else std::cout << " "; 
+  for ( int i = 0; i < seq1.size(); i++ ) if ( v1[i] >= 0 ) std::cout << "|"; else std::cout << " ";
   std::cout << std::endl;
-  for ( int i = 0; i < seq2.size(); i++ ) if ( v2[i] >= 0 ) std::cout << "|"; else std::cout << " "; 
+  for ( int i = 0; i < seq2.size(); i++ ) if ( v2[i] >= 0 ) std::cout << "|"; else std::cout << " ";
   std::cout << std::endl;
   std::cout << seq2 << std::endl;
   */
@@ -425,56 +425,141 @@ bool ProteinTools::chain_number( clipper::MiniMol& mol )
   return true;
 }
 
-
-bool ProteinTools::chain_label( clipper::MiniMol& mol )
+bool ProteinTools::chain_label( clipper::MiniMol& mol, clipper::MMDBManager::TYPE cifflag )
 {
   // set up default chain labels
   std::vector<clipper::String> labels;
   labels.push_back( "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" );
   labels.push_back( "0123456789" );
+  bool lbl_alpha[53][52] = {0};
+  bool lbl_num[10][10] = {0};
 
   // get existing labels
-  clipper::String chainids = "";
   for ( int chn = 0; chn < mol.size(); chn++ )
-    chainids = chainids + mol[chn].id();
-
-  // eliminate labels used in known structure
-  //for ( int i = 0; i < labels.size(); i++ ) {
-  for ( int i = 0; i < 1; i++ ) {
-    clipper::String newlabels;
-    for ( int j = 0; j < labels[i].length(); j++ )
-      if ( chainids.find( labels[i].substr(j,1) ) == clipper::String::npos )
-        newlabels += labels[i].substr(j,1);
-    labels[i] = newlabels;
+  {
+    std::pair<int, int> index;
+    index = get_usedlabels(mol[chn].id(), labels);
+    if ( index.second - 52 < 0 )
+      lbl_alpha[index.first][index.second] = 1;
+    else
+      lbl_num[index.first-1][index.second] = 1;
   }
-
+    
   // label chains
   int label = 0;
   for ( int chn = 0; chn < mol.size(); chn++ ) {
     if ( mol[chn].id() == "" ) {
-      // label chains with letters
-      if ( label < labels[0].length() ) {
-        mol[chn].set_id( labels[0].substr( label, 1 ) );
-        label++;
-      // pack remaining residues into numbered chains
-      } else {
-        int c0 = label - labels[0].length();
-        int c1 = c0 % labels[1].length();
-        clipper::String id = labels[1].substr( c1, 1 );
-        int rmax = 1;
-        for ( int c = 0; c < mol.size(); c++ )
-          if ( mol[c].id() == id )
-            rmax = std::max(rmax,mol[c][mol[c].size()-1].seqnum()+5);
-        mol[chn].set_id( id );
-        for ( int res = 0; res < mol[chn].size(); res++ )
-          mol[chn][res].set_seqnum( rmax + res );
-        label++;
-      }
+      bool newlabelled = false;
+      do{
+        newlabelled = false;
+        int r, c;
+        // label chains with letters
+        if ( label < labels[0].length() ) {
+          if (!lbl_alpha[0][label])
+          {
+            mol[chn].set_id( labels[0].substr( label, 1 ) );
+            newlabelled = true;
+            label++;
+          }
+          else label++;
+        }
+        else
+        {
+          if ( cifflag == clipper::MMDBManager::CIF )
+          {
+            if (label < 2756 )
+            {
+              c = ( label - labels[0].length() ) % labels[0].length();
+              r = ( label - labels[0].length() ) / labels[0].length();
+              if (!lbl_alpha[r][c])
+              {
+                mol[chn].set_id( labels[0].substr( r, 1 ) + labels[0].substr( c, 1 ) ); 
+                newlabelled = true;
+                label++;
+              }
+              else label++;
+            }
+            else
+            {
+              if ( label < 2856 )
+              {
+                c = ( label - 2756 ) % labels[1].length();
+                r = ( label - 2756 ) / labels[1].length();
+              }
+              else
+              {
+                c = ( label - 2756 ) % labels[1].length();
+                r = ( label - 2756 ) / labels[1].length() % labels[1].length();
+              }
+              if (!lbl_num[r][c])
+              {
+                clipper::String newid="";
+                if (r==0)
+                  newid = labels[1].substr( c, 1 ); 
+                else
+                  newid = labels[1].substr( r, 1 ) + labels[1].substr( c, 1 );
+                int rmax = 1;
+                for ( int f = 0; f < mol.size(); f++)
+                  if ( mol[f].id() == newid )
+                    rmax = std::max(rmax, mol[f][mol[f].size()-1].seqnum()+5);
+                mol[chn].set_id( newid );
+                for ( int res = 0; res < mol[chn].size(); res++)
+                  mol[chn][res].set_seqnum( rmax + res );
+                newlabelled = true;
+                label++;
+              }
+              else label++;
+            }
+          }
+          else
+          {
+            c = ( label - labels[0].length() ) % labels[1].length();
+            if (!lbl_num[0][c])
+            {
+              // pack remaining residues into numbered chains
+              clipper::String newid = labels[1].substr( c, 1 );
+              int rmax = 1;
+              for ( int f = 0; f < mol.size(); f++)
+                if ( mol[f].id() == newid )
+                  rmax = std::max(rmax, mol[f][mol[f].size()-1].seqnum()+5);
+              mol[chn].set_id( newid );
+              for ( int res = 0; res < mol[chn].size(); res++)
+                mol[chn][res].set_seqnum( rmax + res );
+              newlabelled = true;
+              label++;
+            }
+            else label++;
+          }
+        }
+      }while(!newlabelled);
     }
   }
   return true;
+
 }
 
+std::pair<int, int> ProteinTools::get_usedlabels(clipper::String chainid, std::vector<clipper::String> labels)
+{
+    int ind[2] = {-1, -1};
+    int row = -1, column = -1;
+    // check chars in chain id
+    for (int i=0; i<chainid.length(); i++)
+      for ( int v=0; v<1; v++)
+        for ( int j =0; j<labels[v].length();j++)
+          if ( chainid[i] == labels[v][j]) ind[i] = j;
+
+    if( ind[1] == -1) // single char chain id
+    {
+      row = 0;
+      column = ind[0];
+    }
+    else // double char chain id
+    {
+      row = ind[0] + 1; // offset the first row of single char
+      column = ind[1];
+    }
+    return std::make_pair(row, column);
+}
 
 bool ProteinTools::copy_residue_types( clipper::MiniMol& target, const clipper::MiniMol& source )
 {
@@ -802,6 +887,7 @@ float ProteinTools::main_chain_u_mean( const clipper::MiniMol& mol )
   return count > 0 ? total / count : 0.5;
 }
 
+
 bool ProteinTools::split_chains_at_gap( clipper::MiniMol& mol )
 {
   typedef clipper::MMonomer Mm;
@@ -823,7 +909,7 @@ bool ProteinTools::split_chains_at_gap( clipper::MiniMol& mol )
   }
 
   // sort the chains by size
-  std::vector<std::pair<int,int> > chnsiz( target.size() ); 
+  std::vector<std::pair<int,int> > chnsiz( target.size() );
   for ( int chn = 0; chn < target.size(); chn++ )
     chnsiz[chn] = std::pair<int,int>( -target[chn].size(), chn );
   std::sort( chnsiz.begin(), chnsiz.end() );

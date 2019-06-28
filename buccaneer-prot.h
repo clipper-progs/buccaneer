@@ -155,7 +155,8 @@ class ProteinTools {
   static std::pair<int,int> chain_sequence_match( const clipper::String& chnseq, const clipper::MMoleculeSequence& seq );
   static clipper::RTop_orth superpose( const clipper::MPolymer& mp1, const clipper::MPolymer& mp2, const double& rmsd, const int& nmatch, const int& nmismatch );
   static bool chain_number( clipper::MiniMol& mol );
-  static bool chain_label( clipper::MiniMol& mol );
+  static bool chain_label( clipper::MiniMol& mol, clipper::MMDBManager::TYPE cifflag );
+  static std::pair<int,int> get_usedlabels(clipper::String chainid, std::vector<clipper::String> labels);
   static bool copy_residue_types( clipper::MiniMol& target, const clipper::MiniMol& source );
   static bool globularise( clipper::MiniMol& mol, const clipper::Coord_frac cent );
   static bool globularise( clipper::MiniMol& mol );

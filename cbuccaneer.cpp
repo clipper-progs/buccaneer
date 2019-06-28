@@ -27,7 +27,7 @@ extern "C" {
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.6.6", "$Date: 2019/04/10" );
+  CCP4Program prog( "cbuccaneer", "1.6.7", "$Date: 2019/06/28" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2017 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -238,7 +238,8 @@ int main( int argc, char** argv )
     }
   }
   if ( args.size() <= 1 ) {
-    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-xmlout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-tidy\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-known-structure <atomid[,radius]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-no-correlation-mode\n\t-mr-model\n\t-mr-model-seed\n\t-mr-model-filter\n\t-mr-model-filter-sigma <sigma>\n\t-model-filter\n\t-model-filter-sigma <sigma>\n\t-jobs <CPUs>\nAn input pdb and mtz are required for the reference structure, and \nan input mtz file for the work structure. Chains will be located and \ngrown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, \nthen the input model is extended.\n";
+    std::cout << "\nUsage: cbuccaneer\n\t-mtzin-ref <filename>\n\t-pdbin-ref <filename>\n\t-mtzin <filename>\t\tCOMPULSORY\n\t-seqin <filename>\n\t-pdbin <filename>\n\t-pdbin-mr <filename>\n\t-pdbin-sequence-prior <filename>\n\t-pdbout <filename>\n\t-xmlout <filename>\n\t-colin-ref-fo <colpath>\n\t-colin-ref-hl <colpath>\n\t-colin-fo <colpath>\t\tCOMPULSORY\n\t-colin-hl <colpath> or -colin-phifom <colpath>\tCOMPULSORY\n\t-colin-fc <colpath>\n\t-colin-free <colpath>\n\t-resolution <resolution/A>\n\t-find\n\t-grow\n\t-join\n\t-link\n\t-sequence\n\t-correct\n\t-filter\n\t-ncsbuild\n\t-prune\n\t-rebuild\n\t-tidy\n\t-fast\n\t-anisotropy-correction\n\t-build-semet\n\t-fix-position\n\t-cycles <num_cycles>\n\t-fragments <max_fragments>\n\t-fragments-per-100-residues <num_fragments>\n\t-ramachandran-filter <type>\n\t-known-structure <atomid[,radius]>\n\t-main-chain-likelihood-radius <radius/A>\n\t-side-chain-likelihood-radius <radius/A>\n\t-sequence-reliability <value>\n\t-new-residue-name <type>\n\t-new-residue-type <type>\n\t-correlation-mode\n\t-no-correlation-mode\n\t-mr-model\n\t-mr-model-seed\n\t-mr-model-filter\n\t-mr-model-filter-sigma <sigma>\n\t-model-filter\n\t-model-filter-sigma <sigma>\n\t-jobs <CPUs>\n\t-cif\t\t*will only output model in cif format\n\t-output-intermediate-models\n\t-verbose verbosity\n";
+    std::cout << "\nAn input pdb and mtz are required for the reference structure, and an input mtz file for the work structure. Chains will be located and grown for the work structure and written to the output pdb file. \nThis involves 10 steps:\n finding, growing, joining, linking, sequencing, correcting, filtering, ncs building, pruning, and rebuilding. \nIf the optional input pdb file is provided for the work structure, then the input model is extended." << std::endl;
     exit(1);
   }
 
@@ -271,6 +272,7 @@ int main( int argc, char** argv )
     correl = ( ippdb_wrk != "NONE" || mr_model );
   if ( ipmtz_ref == "NONE" || ippdb_ref == "NONE" )
     BuccaneerUtil::set_reference( ipmtz_ref, ippdb_ref );
+    
   BuccaneerLog log( title );
   // messages
   std::cout << std::endl << ((correl)?std::string("Correlation mode selected"):std::string("Correlation mode not selected")) << std::endl << std::endl;
@@ -324,12 +326,12 @@ int main( int argc, char** argv )
     uaniso = sfscl.u_aniso_orth( SFscale::F );
     // scale map coeffs
     Compute_scale_u_aniso_fphi compute_aniso( 1.0, -uaniso );
-    if ( ipcol_wrk_fc != "NONE" ) wrk_fp.compute( wrk_fp, compute_aniso );    
+    if ( ipcol_wrk_fc != "NONE" ) wrk_fp.compute( wrk_fp, compute_aniso );
     // output
     std::cout << std::endl << "Applying anisotropy correction:"
               << std::endl << uaniso.format() << std::endl << std::endl;
   }
-  
+
   // apply free flag
   clipper::HKL_data<F_sigF> wrk_fwrk = wrk_f;
   //wrk_fwrk.mask( flag != freerindex );
@@ -387,7 +389,6 @@ int main( int argc, char** argv )
   // STAGE 1: Calculate target from reference data
 
   {
-
     // reference map
     clipper::HKL_data<F_phi>   ref_fp( hkls_ref );
     clipper::HKL_data<Phi_fom> ref_pw( hkls_ref );
@@ -490,7 +491,7 @@ int main( int argc, char** argv )
         std::cout << " C-alphas after growing:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
         log.log( "GROW", mol_wrk, verbose>9 );
       }
-    
+
       // join C-alphas
       if ( join ) {
         Ca_join cajoin( 2.0, 2.0 );
@@ -506,7 +507,7 @@ int main( int argc, char** argv )
         std::cout << " C-alphas linked:           " << calnk.num_linked() << std::endl;
         log.log( "LINK", mol_wrk, verbose>9 );
       }
-    
+
       // assign sequences
       if ( seqnc ) {
         Ca_sequence caseq( seq_rel );
@@ -560,7 +561,8 @@ int main( int argc, char** argv )
       knownstruc.prune( mol_wrk );
       ProteinTools::split_chains_at_gap( mol_wrk );
       ProteinTools::chain_number( mol_wrk );
-      ProteinTools::chain_label( mol_wrk );
+      ProteinTools::chain_label( mol_wrk, cifflag );
+      log.log( "TDYI", mol_wrk, verbose>9 );
 
       // user output
       std::cout << std::endl;
@@ -577,7 +579,7 @@ int main( int argc, char** argv )
         clipper::String c( cyc, 1 );
         clipper::MMDBfile mmdb;
         mmdb.export_minimol( mol_wrk );
-        mmdb.write_file( oppdb.substr(0,oppdb.rfind(".")+1) + c + ".pdb" );
+        mmdb.write_file( oppdb.substr(0,oppdb.rfind(".")+1) + c + oppdb.substr(oppdb.rfind(".")), cifflag );
       }
     } // next cycle
 
@@ -594,6 +596,7 @@ int main( int argc, char** argv )
       // rebuild side chains again due to possible change in sequence. FUTURE: flex side chains
       //Ca_build cabuild( newrestype );  // , True?
       //cabuild( mol_wrk, xwrk );
+      log.log("TIDY", mol_wrk, verbose>9 );
     }
 
     // Assign default B-factors to missing values
@@ -614,9 +617,11 @@ int main( int argc, char** argv )
     // add known structure from input model
     bool copy = knownstruc.copy_to( mol_wrk );
     if ( !copy ) std::cout << "$TEXT:Warning: $$ $$\nWARNING: chain ID clash between known-structure and pdbin-mr. Chains renamed.\n$$" << std::endl;
+    
     // label unlabelled chains
-    ProteinTools::chain_label( mol_wrk );
-
+    ProteinTools::chain_label( mol_wrk, cifflag );
+    log.log("LABE",mol_wrk,verbose>9);
+    
     // write answers
     clipper::MMDBfile mmdb;
     mmdb.export_minimol( mol_wrk );
