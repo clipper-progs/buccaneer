@@ -269,7 +269,7 @@ int main( int argc, char** argv )
   if ( !(find||grow||join||link||seqnc||corct||filtr||ncsbd||prune||build||tidy) )
     find=grow=join=link=seqnc=corct=filtr=ncsbd=prune=build=tidy=true;
   if ( !( correl || nocorrel ) )
-    correl = ( ippdb_wrk != "NONE" || mr_model );
+    correl = ( ippdb_wrk != "NONE" || ippdb_mr != "NONE" );
   if ( ipmtz_ref == "NONE" || ippdb_ref == "NONE" )
     BuccaneerUtil::set_reference( ipmtz_ref, ippdb_ref );
     
