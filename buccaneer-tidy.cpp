@@ -92,6 +92,7 @@ bool ModelTidy::sequence_correct( clipper::MiniMol& mol, const clipper::MMolecul
 std::vector<int> ModelTidy::chain_assign( const clipper::MiniMol& mol, const clipper::MiniMol& mol_mr, const std::vector<int> seqnums, const double rmsd, const int nmin )
 {
   const int nchn = mol.size();
+  const int maxactive = 30;
 
   // source chain clash data
   const std::vector<int> num_seq = sequence_count( mol );
@@ -147,9 +148,15 @@ std::vector<int> ModelTidy::chain_assign( const clipper::MiniMol& mol, const cli
   int nsrc = 0;
   for ( int s = 0; s < nseqs; s++ ) {
     std::vector<int> active( nchn ), used_best( nchn, false ), used;
-    // make a list of chains matching this sequence 
-    for ( int c = 0; c < nchn; c++ )
-      active[c] = ( seqnums[c] == s );
+    // make a list of chains matching this sequence
+    int nactive = 0;
+    for ( int c = 0; c < nchn; c++ ) {
+      if ( seqnums[c] == s ) {
+        active[c] = true;
+        nactive++;
+        if ( nactive >= maxactive ) break;
+      }
+    }
     // find the biggest group of superposable chains
     best_closed_ncs_group( super, num_seq, active, used_best, used );
     // label them as starting groups
