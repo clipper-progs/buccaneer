@@ -52,7 +52,12 @@ class Ca_group {
     { return clipper::Coord_orth( 0.8431, 0.0000,-1.2040 ); }  //!< std N
   static clipper::Coord_orth std_coord_cb()
     { return clipper::Coord_orth( -1.03, -1.11, 0.00 ); }  //!< std C-b
-  static Ca_group null() { clipper::Coord_orth n(clipper::Coord_orth::null()); return Ca_group(n,n,n); }
+  static Ca_group null() 
+#if defined (__MINGW32__) || defined (__MINGW64__)
+    { clipper::Coord_orth n(clipper::Coord_orth::null()); n[0] = clipper::Util::nanf(); return Ca_group(n,n,n); }
+#else
+    { clipper::Coord_orth n(clipper::Coord_orth::null()); return Ca_group(n,n,n); }
+#endif
  private:
   clipper::Coord_orth coord_n_, coord_ca_, coord_c_;
 };
