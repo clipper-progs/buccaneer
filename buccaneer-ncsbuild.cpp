@@ -11,6 +11,7 @@
 
 bool Ca_ncsbuild::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq ) const
 {
+  clipper::Cell       cell = xmap.cell();
   clipper::Spacegroup spgr = xmap.spacegroup();
 
   // get center of mass
@@ -27,6 +28,29 @@ bool Ca_ncsbuild::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
   // split into separate chains
   ProteinTools::split_chains_at_gap( mol );
 
+  // get non-bond list for Ca's to eliminate trivial superpositions
+  const double dmin  = 1.1;
+  clipper::MiniMol camodel( spgr, cell );
+  camodel.model() = mol.select( "*/*/ CA ", clipper::MM::ANY );
+  if ( camodel.size() != mol.size() ) clipper::Message::message( clipper::Message_fatal( "NCSbuild: internal error - length mismatch" ) );
+  clipper::MAtomNonBond nb( camodel, 3.0 );
+  std::vector<clipper::MAtomIndexSymmetry> atomnb;
+  clipper::Matrix<int> contacts( mol.size(), mol.size(), 0 );
+  for ( int c1 = 0; c1 < camodel.size(); c1++ ) {
+    for ( int r1 = 0; r1 < camodel[c1].size(); r1++ ) {
+      if ( camodel[c1][r1].size() == 1 ) {
+        atomnb = nb( camodel[c1][r1][0].coord_orth(), dmin );
+        for ( int i = 0; i < atomnb.size(); i++ ) {
+          const int c2 = atomnb[i].polymer();
+          contacts(c1,c2) += 1;
+        }
+      }
+    }
+    std::cout << "[ " << std::endl;
+    for ( int c2 = 0; c2 < mol.size(); c2++ ) std::cout << clipper::String(contacts(c1,c2)) << " ";
+    std::cout << " ]" << std::endl;
+  }
+
   // now loop over chains
   for ( int chn1 = 0; chn1 < mol.size(); chn1++ ) {
     // assemble combined model for this chain
@@ -37,7 +61,7 @@ bool Ca_ncsbuild::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
     mol_wrk.insert( mp1 );
     // add any other matching chains
     for ( int chn2 = 0; chn2 < mol.size(); chn2++ ) {
-      if ( chn2 != chn1 ) {
+      if ( chn2 != chn1 && contacts(chn1,chn2) < nmin_ ) {
         clipper::RTop_orth rtop =
           ProteinTools::superpose( mol[chn2], mol[chn1], rmsd_, nmin_, nmin_ );
         if ( !rtop.is_null() ) {
