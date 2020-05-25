@@ -27,7 +27,7 @@ extern "C" {
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.6.8", "$Date: 2020/03/18" );
+  CCP4Program prog( "cbuccaneer", "1.6.9", "$Date: 2020/05/19" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2020 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -64,6 +64,7 @@ int main( int argc, char** argv )
   int nfragr = 20;
   int freerindex = 0;
   int modelindex = 0;
+  int randomseed = -1;
   bool merge = false;  // multimodel merge
   bool find  = false;  // calculation steps
   bool grow  = false;
@@ -186,6 +187,8 @@ int main( int argc, char** argv )
       if ( ++arg < args.size() ) freerindex = clipper::String(args[arg]).i();
     } else if ( key == "-model-index" ) {
       if ( ++arg < args.size() ) modelindex = clipper::String(args[arg]).i();
+    } else if ( key == "-random-seed" ) {
+      if ( ++arg < args.size() ) randomseed = clipper::String(args[arg]).i();
     } else if ( key == "-ramachandran-filter" ) {
       if ( ++arg < args.size() ) {
         if ( args[arg] == "all"      ) rama_flt = Ca_prep::rama_flt_all;
@@ -244,6 +247,7 @@ int main( int argc, char** argv )
   }
 
   // other initialisations
+  if ( randomseed >= 0 ) srand( randomseed );
   using clipper::data32::Compute_abcd_from_phifom;
   using clipper::data32::Compute_phifom_from_abcd;
   using clipper::data32::Compute_fphi_from_fsigf_phifom;
