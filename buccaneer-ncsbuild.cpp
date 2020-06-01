@@ -11,9 +11,8 @@
 
 bool Ca_ncsbuild::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, const std::vector<LLK_map_target>& llktarget, const clipper::MMoleculeSequence& seq ) const
 {
-  clipper::Cell       cell = xmap.cell();
+  //clipper::Cell       cell = xmap.cell();
   clipper::Spacegroup spgr = xmap.spacegroup();
-  clipper::MiniMol mol_old = mol;
 
   // get center of mass
   clipper::Coord_orth com( 0.0, 0.0, 0.0 );
@@ -83,35 +82,6 @@ bool Ca_ncsbuild::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>
             mol[chn1] = mp2;
           }
         }
-      }
-    }
-  }
-
-  // now we need to check if any later chains are duplicates of earlier, more reliable chains
-  // get non-bond list for Ca's to eliminate trivial superpositions
-  const double dmin = 1.5;
-  clipper::MiniMol camodel( spgr, cell );
-  camodel.model() = mol.select( "*/*/ CA ", clipper::MM::ANY );
-  if ( camodel.size() != mol.size() ) clipper::Message::message( clipper::Message_fatal( "NCSbuild: internal error - length mismatch" ) );
-  clipper::MAtomNonBond nb( camodel, 3.0 );
-  std::vector<clipper::MAtomIndexSymmetry> atomnb;
-  clipper::Matrix<int> contacts( mol.size(), mol.size(), 0 );
-  for ( int c1 = 0; c1 < camodel.size(); c1++ ) {
-    for ( int r1 = 0; r1 < camodel[c1].size(); r1++ ) {
-      if ( camodel[c1][r1].size() >= 1 ) {
-        atomnb = nb( camodel[c1][r1][0].coord_orth(), dmin );
-        for ( int i = 0; i < atomnb.size(); i++ ) {
-          const int c2 = atomnb[i].polymer();
-          contacts(c1,c2) += 1;
-        }
-      }
-    }
-  }
-  // for any heavily contacted chain, check if they superpose
-  for ( int c2 = 0; c2 < camodel.size(); c2++ ) {
-    for ( int c1 = 0; c1 < c2; c1++ ) {
-      if ( contacts(c1,c2) > contacts(c2,c2)/2 ) {
-        mol[c2] = mol_old[c2];
       }
     }
   }

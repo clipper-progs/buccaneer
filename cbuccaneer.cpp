@@ -27,7 +27,7 @@ extern "C" {
 
 int main( int argc, char** argv )
 {
-  CCP4Program prog( "cbuccaneer", "1.6.9", "$Date: 2020/05/19" );
+  CCP4Program prog( "cbuccaneer", "1.6.10", "$Date: 2020/05/29" );
   prog.set_termination_message( "Failed" );
 
   std::cout << std::endl << "Copyright 2002-2020 Kevin Cowtan and University of York." << std::endl << std::endl;
@@ -548,7 +548,7 @@ int main( int argc, char** argv )
       // prune C-alphas for clashes with other chains and known model
       if ( prune ) {
         Ca_prune caprune( 3.0 );
-        caprune( mol_wrk );
+        caprune( mol_wrk, xwrk );
         std::cout << " C-alphas after pruning:    " << mol_wrk.select("*/*/CA").atom_list().size() << std::endl;
         log.log( "PRUN", mol_wrk, verbose>9 );
       }

@@ -9,9 +9,9 @@
 class Ca_prune {
  public:
   Ca_prune( double rad = 3.0 ) : rad_(rad) {}
-  static bool prune( clipper::MiniMol& mol, double rad = 3.0 );
-  bool operator() ( clipper::MiniMol& mol ) const;
+  static bool prune( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap, double rad = 3.0 );
+  bool operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& xmap ) const;
  private:
-  static std::vector<int> score_positions( const clipper::MPolymer& mp );
+  static std::vector<float> score_positions( const clipper::MPolymer& mp, const std::vector<float>& scr );
   clipper::ftype rad_;
 };

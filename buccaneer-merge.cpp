@@ -85,7 +85,7 @@ bool Ca_merge::operator() ( clipper::MiniMol& mol, const clipper::Xmap<float>& x
   }
 
   ProteinTools::split_chains_at_gap( mol );  // split chains
-  Ca_prune::prune( mol );
+  Ca_prune::prune( mol, xmap );
   Ca_build::build( mol, xmap );
   ProteinTools::split_chains_at_gap( mol );  // rename chains
   return true;
