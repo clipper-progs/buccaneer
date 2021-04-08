@@ -19,7 +19,7 @@ KnownStructure::KnownStructure( const clipper::MiniMol& mol, const std::vector<s
   if ( nprad >= 0.0 ) {
     for ( int p = 0; p < tmp.size(); p++ ) {
       for ( int m = 0; m < tmp[p].size(); m++ ) {
-        if ( tmp[p][m].lookup(" CA ",clipper::MM::ANY) < 0 ) {
+        if ( ! ProteinTools::is_protein( tmp[p][m] ) ) {
           bool sel = false;
           if ( tmp[p][m].size() > 1 ) sel = true;
           if ( tmp[p][m].size() == 1 && tmp[p][m][0].element().trim() != "O" ) sel = true;

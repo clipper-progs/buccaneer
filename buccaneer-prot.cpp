@@ -7,10 +7,18 @@
 #include <clipper/clipper-contrib.h>
 
 #include <algorithm>
+#include <unordered_set>
 
 extern "C" {
 #include <string.h>
 }
+
+
+const std::unordered_set<std::string> PROTEIN_TYPES = {
+  "ALA","ARG","ASN","ASP","CYS","GLN","GLU","GLY","HIS","ILE",
+  "LEU","LYS","MET","PHE","PRO","SER","THR","TRP","TYR","VAL",
+  "MSE","UNK"
+};
 
 
 Ca_group::Ca_group( const clipper::MMonomer& mm )
@@ -1160,4 +1168,10 @@ void ProteinTools::trim_to_protein( clipper::MiniMol& mol )
       }
       if ( mp.size() > 0 ) mol.insert( mp );
     }
+}
+
+bool ProteinTools::is_protein( const clipper::MMonomer& mm )
+{
+  if ( PROTEIN_TYPES.find( mm.type() ) != PROTEIN_TYPES.end() ) return true;
+  return mm.lookup( " CA ", clipper::MM::ANY ) >= 0;
 }

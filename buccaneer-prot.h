@@ -170,6 +170,7 @@ class ProteinTools {
   static std::vector<Ca_chain> ca_chains( const clipper::MiniMol& mol );
   static void insert_ca_chains( clipper::MiniMol& mol, const std::vector<Ca_chain>& chains );
   static void trim_to_protein( clipper::MiniMol& mol );
+  static bool is_protein( const clipper::MMonomer& mm );
  private:
   class MapFilterFn_g5 : public clipper::MapFilterFn_base { public:
     clipper::ftype operator() ( const clipper::ftype& radius ) const { return exp(-radius*radius/50.0); }
