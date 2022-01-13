@@ -728,6 +728,7 @@ bool ProteinTools::symm_match( clipper::MiniMol& molwrk, const clipper::MiniMol&
 
   // calculate extent of model
   clipper::Atom_list atomr = molref.atom_list();
+  if (atomr.size() == 0) return true;
   clipper::Range<clipper::ftype> urange, vrange, wrange;
   clipper::Coord_frac cfr( 0.0, 0.0, 0.0 );
   for ( int i = 0; i < atomr.size(); i++ ) {
